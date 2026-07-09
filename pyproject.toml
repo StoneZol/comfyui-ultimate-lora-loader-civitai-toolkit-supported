@@ -11,6 +11,6 @@ Repository = "https://github.com/WaitWut/comfyui-ultimate-lora-loader"
 "Bug Tracker" = "https://github.com/WaitWut/comfyui-ultimate-lora-loader/issues"
 
 [tool.comfy]
-PublisherId = "WaitWut"
+PublisherId = "waitwut"
 DisplayName = "Ultimate Lora Loader"
 Icon = ""
