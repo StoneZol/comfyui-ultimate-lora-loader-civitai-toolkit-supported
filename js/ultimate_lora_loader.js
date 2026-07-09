@@ -43,6 +43,21 @@ if (!document.getElementById(STYLE_ID)) {
       border-color: #6d5aa8;
     }
 
+    /* Missing on disk - wins over enabled-highlight's background/border so a
+       broken row reads as broken whether it's toggled on or off. */
+    .fll-row.missing,
+    .fll-row.missing.enabled-highlight {
+      background: #3a2323;
+      border-color: #c0392b;
+    }
+    .fll-name.fll-name-missing {
+      color: #ff8a80;
+      cursor: pointer;
+    }
+    .fll-name.fll-name-missing:hover {
+      text-decoration: underline;
+    }
+
     /* --- Toggle switch (replaces checkbox) --- */
     .fll-toggle-switch {
       position: relative;
@@ -397,6 +412,46 @@ let _treeCache = null;
 let _treeCacheTime = 0;
 const TREE_CACHE_MS = 15000; // refresh at most every 15s so new files show up reasonably fast
 
+// Flat set of every valid lora path the backend reports (the exact strings
+// get_filename_list("loras") returns, which is what an entry's `lora` field
+// stores). Stays null until the first successful tree fetch so we never flag
+// rows as "missing" before we actually know what's on disk.
+let validLoraPaths = null;
+
+function _normLora(p) {
+  // Normalize separators so a workflow saved on one OS doesn't read as
+  // "missing" on another; the flag is purely cosmetic so being lenient here
+  // only ever avoids false positives.
+  return String(p).replace(/\\/g, "/");
+}
+
+// Walk the nested tree collecting every value in every __full_paths__ map -
+// those values are the full relative paths, i.e. the source of truth for
+// what's installed. Rebuilt on each tree fetch so added/removed files show up.
+function _rebuildValidLoraPaths(tree) {
+  const set = new Set();
+  (function walk(node) {
+    if (!node || typeof node !== "object") return;
+    const fp = node.__full_paths__;
+    if (fp) {
+      for (const k in fp) set.add(_normLora(fp[k]));
+    }
+    for (const key in node) {
+      if (key === "__files__" || key === "__full_paths__") continue;
+      walk(node[key]);
+    }
+  })(tree);
+  validLoraPaths = set;
+}
+
+// True only when we have a loaded list AND this lora isn't in it. Unknown
+// (list not loaded yet / fetch failed) -> false, so we fail safe toward
+// "not missing" rather than lighting up every row red on a transient hiccup.
+function isLoraMissing(loraName) {
+  if (!validLoraPaths || !loraName) return false;
+  return !validLoraPaths.has(_normLora(loraName));
+}
+
 async function fetchLoraTree(force = false) {
   const now = Date.now();
   if (!force && _treeCache && now - _treeCacheTime < TREE_CACHE_MS) {
@@ -407,6 +462,7 @@ async function fetchLoraTree(force = false) {
     const data = await res.json();
     _treeCache = data;
     _treeCacheTime = now;
+    _rebuildValidLoraPaths(data);
     return data;
   } catch (e) {
     console.error("[UltimateLoraLoader] Failed to fetch lora tree", e);
@@ -571,7 +627,7 @@ function openLoraBrowser(x, y, onSelect) {
 // Node widget
 // ---------------------------------------------------------------------------
 
-function makeRow(entry, { onChange, onRemove, showClipStrength, onDragStart, onDragOver, onDrop, onDragEnd, onPriorityChange, currentPriority }) {
+function makeRow(entry, { onChange, onRemove, onReplace, showClipStrength, onDragStart, onDragOver, onDrop, onDragEnd, onPriorityChange, currentPriority }) {
   const row = document.createElement("div");
   row.className = rowClassName(entry);
   // Row itself isn't draggable - only the dedicated drag handle icon
@@ -660,8 +716,23 @@ function makeRow(entry, { onChange, onRemove, showClipStrength, onDragStart, onD
   const name = document.createElement("div");
   name.className = "fll-name";
   const shortName = entry.lora.split("/").pop();
-  name.textContent = shortName;
-  name.title = entry.lora;
+  const missing = isLoraMissing(entry.lora);
+  name.textContent = missing ? "⚠ " + shortName : shortName;
+  if (missing) {
+    name.classList.add("fll-name-missing");
+    name.title = `File not found on disk:\n${entry.lora}\n\nClick to choose a replacement.`;
+    // Click-to-replace: reopen the same folder browser and swap this row's
+    // lora in place. Cheap stand-in for the roadmap's "click-to-search"
+    // until a real search box exists.
+    name.onclick = (e) => {
+      e.stopPropagation();
+      if (!onReplace) return;
+      const rect = name.getBoundingClientRect();
+      openLoraBrowser(rect.left, rect.bottom + 4, (loraPath) => onReplace(loraPath));
+    };
+  } else {
+    name.title = entry.lora;
+  }
 
   const STRENGTH_STEP = 0.05;
 
@@ -855,6 +926,7 @@ function rowClassName(entry) {
   let cls = "fll-row";
   if (!entry.enabled) cls += " disabled";
   if (entry.enabled) cls += " enabled-highlight";
+  if (isLoraMissing(entry.lora)) cls += " missing";
   return cls;
 }
 
@@ -1073,6 +1145,11 @@ app.registerExtension({
               persist();
               render();
               resizeNode();
+            },
+            onReplace: (loraPath) => {
+              entry.lora = loraPath;
+              persist();
+              render();
             },
             showClipStrength,
             currentPriority: idx + 1,
@@ -1372,6 +1449,13 @@ app.registerExtension({
 
       render();
       syncWidth();
+
+      // Fetch the on-disk lora list so missing-file highlighting can light up
+      // once we know what actually exists. The paint above happens first and
+      // flags nothing (validLoraPaths is null until this resolves); this
+      // re-render applies red highlighting to any rows pointing at files that
+      // are no longer present.
+      fetchLoraTree().then(() => render());
 
       // restore size sanity on load (also re-syncs width once ComfyUI has
       // finished laying out the node on the canvas, in case initial

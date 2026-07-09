@@ -20,6 +20,7 @@ The node in its default state, right after adding it to the canvas:
 - **Native quick-edit dialogs** — click any strength or priority number to get ComfyUI's own auto-selected value-entry dialog (matches the interaction rgthree's nodes use)
 - **Toggle-all / delete-all** — bulk controls in the header row, column-aligned with the per-row toggle and trash icons
 - **Auto-growing node** — the node resizes itself to fit your lora list; shrink it manually below that and the list scrolls internally instead of spilling out
+- **Missing-file detection** — if a row points at a lora that's no longer on disk (moved, renamed, or deleted since the workflow was saved), the row is flagged in red with a ⚠ marker, and its name becomes click-to-replace so you can swap in a working file without rebuilding the row
 
 A populated stack — drag handle, priority number, toggle, name, strength stepper, and trash icon, all column-aligned with the header row's toggle-all and delete-all controls:
 
@@ -32,6 +33,10 @@ Disabling a row (toggle off) dims it, while an added third row still keeps the e
 Connect `clip` and every row gains an independent second stepper — the header switches from a single "Strength" column to "Model" and "Clip":
 
 ![Clip connected, showing the header split into Model and Clip columns with a second stepper per row](docs/screenshot-clip-optional.png)
+
+If a row's lora file goes missing — moved, renamed, or deleted since the workflow was saved — that row is flagged in red with a ⚠ marker instead of silently failing at generation time. Click the highlighted name to reopen the folder browser and pick a replacement in place:
+
+![A lora stack with one row flagged red because its lora file is missing from disk](docs/screenshot-missing-file.png)
 
 ## Install
 
@@ -95,7 +100,6 @@ Planned features, roughly in the order they're likely to land:
 **Self-contained (no external services needed):**
 - Search/filter box in the Add Lora popup — type to filter instead of scrolling through folders
 - Duplicate detection — block re-adding a lora that's already in the stack, with a clear message, since there's no real use case for having the same file twice
-- Missing-file detection — if a saved workflow references a lora that's been moved or deleted, highlight that row (rather than only printing to the console), and offer a way to search for it
 
 **Trigger words, suggested strength, and CivitAI metadata (one combined feature):**
 - A clickable info icon after the lora name, showing trigger words and CivitAI metadata for that lora
