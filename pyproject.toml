@@ -1,7 +1,7 @@
 [project]
 name = "ultimate-lora-loader"
 description = "A Power-Lora-Loader-style dynamic LoRA stack node with a real on-disk folder browser, drag-to-reorder, optional CLIP, and per-lora split model/clip strengths."
-version = "1.0.0"
+version = "1.1.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = []
