@@ -347,6 +347,26 @@ if (!document.getElementById(STYLE_ID)) {
       margin-bottom: 4px;
     }
 
+    .fll-search {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0 0 4px 0;
+      padding: 6px 8px;
+      background: #1c1c1f;
+      border: 1px solid #444;
+      border-radius: 5px;
+      color: #ddd;
+      font-size: 12px;
+      outline: none;
+    }
+    .fll-search:focus {
+      border-color: #6d5aa8;
+    }
+    .fll-search::placeholder {
+      color: #777;
+    }
+
     .fll-crumb {
       cursor: pointer;
       color: #a78bfa;
@@ -868,18 +888,34 @@ function openLoraBrowser(x, y, onSelect) {
   popup.style.left = Math.min(x, vw - 380) + "px";
   popup.style.top = Math.min(y, vh - 440) + "px";
 
-  const close = () => overlay.remove();
+  const close = () => {
+    if (searchTimer) clearTimeout(searchTimer);
+    overlay.remove();
+  };
   overlay.addEventListener("mousedown", (e) => {
     if (e.target === overlay) close();
   });
 
   let path = []; // array of folder names representing current drill-down position
+  let searchQuery = "";
+  let searchTimer = null;
+  const SEARCH_DEBOUNCE_MS = 200;
 
   fetchLoraTree().then((tree) => {
     renderLevel(tree);
   });
 
-  function renderLevel(tree) {
+  function goToPath(nextPath, tree) {
+    path = nextPath;
+    searchQuery = "";
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    renderLevel(tree);
+  }
+
+  function renderLevel(tree, { keepSearchFocus = false } = {}) {
     // walk to current path
     let node = tree;
     for (const seg of path) {
@@ -902,8 +938,7 @@ function openLoraBrowser(x, y, onSelect) {
     rootCrumb.className = "fll-crumb" + (path.length === 0 ? " current" : "");
     rootCrumb.textContent = "loras";
     rootCrumb.onclick = () => {
-      path = [];
-      renderLevel(tree);
+      goToPath([], tree);
     };
     crumbs.appendChild(rootCrumb);
 
@@ -918,13 +953,47 @@ function openLoraBrowser(x, y, onSelect) {
       crumb.className = "fll-crumb" + (isCurrent ? " current" : "");
       crumb.textContent = seg;
       crumb.onclick = () => {
-        path = path.slice(0, idx + 1);
-        renderLevel(tree);
+        goToPath(path.slice(0, idx + 1), tree);
       };
       crumbs.appendChild(crumb);
     });
 
     popup.appendChild(crumbs);
+
+    // Primitive filter over the currently visible folder list.
+    const search = document.createElement("input");
+    search.type = "search";
+    search.className = "fll-search";
+    search.placeholder = "Filter folders & files…";
+    search.value = searchQuery;
+    search.autocomplete = "off";
+    search.spellcheck = false;
+    // Stop Comfy/LiteGraph from eating keystrokes while typing in the popup.
+    search.addEventListener("keydown", (e) => e.stopPropagation());
+    search.addEventListener("keyup", (e) => e.stopPropagation());
+    search.addEventListener("keypress", (e) => e.stopPropagation());
+    search.oninput = () => {
+      const pending = search.value;
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        searchQuery = pending;
+        renderLevel(tree, { keepSearchFocus: true });
+      }, SEARCH_DEBOUNCE_MS);
+    };
+    popup.appendChild(search);
+
+    if (keepSearchFocus) {
+      // Re-focus after re-render so debounce doesn't steal the caret.
+      requestAnimationFrame(() => {
+        search.focus();
+        const len = search.value.length;
+        try {
+          search.setSelectionRange(len, len);
+        } catch (_) {
+          /* search inputs in some browsers are picky about selection */
+        }
+      });
+    }
 
     // subfolders (any key that isn't __files__ / __full_paths__)
     const subfolders = Object.keys(node)
@@ -934,15 +1003,23 @@ function openLoraBrowser(x, y, onSelect) {
     const files = (node.__files__ || []).slice().sort((a, b) => a.localeCompare(b));
     const fullPaths = node.__full_paths__ || {};
 
-    if (subfolders.length === 0 && files.length === 0) {
+    const q = searchQuery.trim().toLowerCase();
+    const visibleFolders = q
+      ? subfolders.filter((f) => f.toLowerCase().includes(q))
+      : subfolders;
+    const visibleFiles = q
+      ? files.filter((f) => f.toLowerCase().includes(q))
+      : files;
+
+    if (visibleFolders.length === 0 && visibleFiles.length === 0) {
       const empty = document.createElement("div");
       empty.className = "fll-empty";
-      empty.textContent = "No LoRAs here";
+      empty.textContent = q ? "No matches" : "No LoRAs here";
       popup.appendChild(empty);
       return;
     }
 
-    for (const folder of subfolders) {
+    for (const folder of visibleFolders) {
       const entry = document.createElement("div");
       entry.className = "fll-entry";
 
@@ -963,14 +1040,13 @@ function openLoraBrowser(x, y, onSelect) {
       entry.appendChild(arrow);
 
       entry.onclick = () => {
-        path = [...path, folder];
-        renderLevel(tree);
+        goToPath([...path, folder], tree);
       };
 
       popup.appendChild(entry);
     }
 
-    for (const file of files) {
+    for (const file of visibleFiles) {
       const entry = document.createElement("div");
       entry.className = "fll-entry";
 

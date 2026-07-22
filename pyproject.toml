@@ -1,16 +1,16 @@
 [project]
 name = "ultimate-lora-loader-civitai"
-description = "Fork of Ultimate Lora Loader with per-row Civitai Toolkit info: folder browser, drag-to-reorder, optional CLIP, and a ? button that opens Toolkit's Civitai model info modal."
+description = "Fork of Ultimate Lora Loader: folder browser + filter, and a per-row ? button that opens Civitai Toolkit model info (tested with Toolkit 4.1.3)."
 version = "1.2.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = []
 
 [project.urls]
-Repository = "https://github.com/WaitWut/comfyui-ultimate-lora-loader"
-"Bug Tracker" = "https://github.com/WaitWut/comfyui-ultimate-lora-loader/issues"
+Repository = "https://github.com/StoneZol/comfyui-ultimate-lora-loader-civitai-toolkit-supported"
+"Bug Tracker" = "https://github.com/StoneZol/comfyui-ultimate-lora-loader-civitai-toolkit-supported/issues"
 
 [tool.comfy]
-PublisherId = "waitwut"
+PublisherId = "stonezol"
 DisplayName = "Ultimate Lora Loader (Civitai)"
 Icon = ""
