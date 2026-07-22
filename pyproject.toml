@@ -1,6 +1,6 @@
 [project]
 name = "ultimate-lora-loader-civitai"
-description = "Fork of Ultimate Lora Loader: folder browser + filter, and a per-row ? button that opens Civitai Toolkit model info (tested with Toolkit 4.1.3)."
+description = "Fork of Ultimate Lora Loader: folder browser + filter, dual info buttons (? = Civitai Toolkit local DB, i = Custom Scripts View Lora info). Tested with Civitai Toolkit 4.1.3 and ComfyUI-Custom-Scripts 1.2.5."
 version = "1.2.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
@@ -14,3 +14,8 @@ Repository = "https://github.com/StoneZol/comfyui-ultimate-lora-loader-civitai-t
 PublisherId = "stonezol"
 DisplayName = "Ultimate Lora Loader (Civitai)"
 Icon = ""
+
+# Soft dependencies (not installed via pip — ComfyUI custom_nodes). Versions we tested against:
+[tool.ultimate-lora-loader-civitai.tested_with]
+"Civitai Toolkit" = "4.1.3"
+"ComfyUI-Custom-Scripts" = "1.2.5"

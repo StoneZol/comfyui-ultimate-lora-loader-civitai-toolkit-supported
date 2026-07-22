@@ -421,7 +421,7 @@ if (!document.getElementById(STYLE_ID)) {
       text-align: center;
     }
 
-    /* --- Civitai info button --- */
+    /* --- Info buttons: Toolkit local (?) + pysssss full (i) --- */
     .fll-info {
       flex: 0 0 20px;
       width: 20px;
@@ -441,9 +441,18 @@ if (!document.getElementById(STYLE_ID)) {
       background: #3a3a3e;
       color: #a78bfa;
     }
+    .fll-info.fll-info-full:hover {
+      color: #60a5fa;
+    }
     .fll-header-info-slot {
       flex: 0 0 20px;
       width: 20px;
+    }
+    .fll-header-info-pair {
+      flex: 0 0 44px;
+      width: 44px;
+      display: flex;
+      gap: 4px;
     }
 
     /* --- Civitai Toolkit-compatible info popup --- */
@@ -778,7 +787,7 @@ function createCivitaiModelInfoPopup(title, model) {
   }
 }
 
-async function openCivitaiLoraInfo(loraPath) {
+async function openCivitaiToolkitLoraInfo(loraPath) {
   const displayName = String(loraPath || "").split(/[/\\]/).pop() || loraPath;
   try {
     const models = await fetchCivitaiLocalModels();
@@ -791,12 +800,67 @@ async function openCivitaiLoraInfo(loraPath) {
     }
     createCivitaiModelInfoPopup(displayName, model);
   } catch (e) {
-    console.error("[UltimateLoraLoaderCivitai] Civitai info failed:", e);
+    console.error("[UltimateLoraLoaderCivitai] Toolkit info failed:", e);
     alert(
-      `Could not open Civitai info.\nIs Civitai Toolkit installed and loaded?\n\n${e.message || e}`
+      `Could not open Toolkit info.\nIs Civitai Toolkit installed and loaded?\n\n${e.message || e}`
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// pysssss "View Lora info" dialog (preview, Civitai link, trained words)
+// Soft dependency on comfyui-custom-scripts
+// ---------------------------------------------------------------------------
+
+let _pysssssModelInfoUrl = null;
+
+async function resolvePysssssModelInfoUrl() {
+  if (_pysssssModelInfoUrl) return _pysssssModelInfoUrl;
+
+  const known = [
+    "/extensions/comfyui-custom-scripts/js/modelInfo.js",
+    "/extensions/ComfyUI-Custom-Scripts/js/modelInfo.js",
+  ];
+  for (const url of known) {
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      if (res.ok) {
+        _pysssssModelInfoUrl = url;
+        return url;
+      }
+    } catch (_) {
+      /* try next */
+    }
+  }
+
+  const list = await (await fetch("/extensions")).json();
+  const hit = (list || []).find((p) => /custom-scripts\/js\/modelInfo\.js$/i.test(p));
+  if (hit) {
+    _pysssssModelInfoUrl = hit.startsWith("/") ? hit : `/${hit}`;
+    return _pysssssModelInfoUrl;
+  }
+
+  throw new Error("comfyui-custom-scripts not found (needed for View Lora info)");
+}
+
+async function openPysssssLoraInfo(loraPath, node) {
+  try {
+    const url = await resolvePysssssModelInfoUrl();
+    const mod = await import(/* @vite-ignore */ url);
+    if (!mod?.LoraInfoDialog) {
+      throw new Error("LoraInfoDialog export missing from modelInfo.js");
+    }
+    new mod.LoraInfoDialog(loraPath, node).show("loras", loraPath);
+  } catch (e) {
+    console.error("[UltimateLoraLoaderCivitai] pysssss Lora info failed:", e);
+    alert(
+      `Could not open View Lora info.\nIs ComfyUI-Custom-Scripts (pysssss) installed?\n\n${e.message || e}`
+    );
+  }
+}
+
+// Back-compat alias used nowhere now, kept only if something still references it
+const openCivitaiLoraInfo = openCivitaiToolkitLoraInfo;
 
 // ---------------------------------------------------------------------------
 // Lora tree fetch (cached per session, refetch on popup open if stale)
@@ -1077,7 +1141,7 @@ function openLoraBrowser(x, y, onSelect) {
 // Node widget
 // ---------------------------------------------------------------------------
 
-function makeRow(entry, { onChange, onRemove, onReplace, onInfo, showClipStrength, onDragStart, onDragOver, onDrop, onDragEnd, onPriorityChange, currentPriority }) {
+function makeRow(entry, { onChange, onRemove, onReplace, onInfoToolkit, onInfoFull, showClipStrength, onDragStart, onDragOver, onDrop, onDragEnd, onPriorityChange, currentPriority }) {
   const row = document.createElement("div");
   row.className = rowClassName(entry);
   // Row itself isn't draggable - only the dedicated drag handle icon
@@ -1356,13 +1420,22 @@ function makeRow(entry, { onChange, onRemove, onReplace, onInfo, showClipStrengt
     );
   }
 
-  const info = document.createElement("div");
-  info.className = "fll-info";
-  info.textContent = "?";
-  info.title = "View Civitai info (requires Civitai Toolkit)";
-  info.onclick = (e) => {
+  const infoToolkit = document.createElement("div");
+  infoToolkit.className = "fll-info";
+  infoToolkit.textContent = "?";
+  infoToolkit.title = "Like Civitai Toolkit → Local Manager";
+  infoToolkit.onclick = (e) => {
     e.stopPropagation();
-    onInfo?.(entry.lora);
+    onInfoToolkit?.(entry.lora);
+  };
+
+  const infoFull = document.createElement("div");
+  infoFull.className = "fll-info fll-info-full";
+  infoFull.textContent = "i";
+  infoFull.title = "Like default LoraLoader → View Lora info";
+  infoFull.onclick = (e) => {
+    e.stopPropagation();
+    onInfoFull?.(entry.lora);
   };
 
   const remove = document.createElement("div");
@@ -1376,7 +1449,8 @@ function makeRow(entry, { onChange, onRemove, onReplace, onInfo, showClipStrengt
   row.appendChild(name);
   row.appendChild(modelStrength);
   if (clipStrength) row.appendChild(clipStrength);
-  row.appendChild(info);
+  row.appendChild(infoToolkit);
+  row.appendChild(infoFull);
   row.appendChild(remove);
 
   return row;
@@ -1558,8 +1632,14 @@ app.registerExtension({
       deleteAllSlot.className = "fll-header-remove-slot";
       deleteAllSlot.innerHTML = TRASH_ICON_SVG;
 
-      const infoHeaderSlot = document.createElement("div");
-      infoHeaderSlot.className = "fll-header-info-slot";
+      const infoHeaderPair = document.createElement("div");
+      infoHeaderPair.className = "fll-header-info-pair";
+      const infoHeaderSlotA = document.createElement("div");
+      infoHeaderSlotA.className = "fll-header-info-slot";
+      const infoHeaderSlotB = document.createElement("div");
+      infoHeaderSlotB.className = "fll-header-info-slot";
+      infoHeaderPair.appendChild(infoHeaderSlotA);
+      infoHeaderPair.appendChild(infoHeaderSlotB);
 
       headerRow.appendChild(dragHandleSpacer);
       headerRow.appendChild(priorityLabel);
@@ -1567,7 +1647,7 @@ app.registerExtension({
       headerRow.appendChild(nameLabel);
       headerRow.appendChild(strengthLabel);
       headerRow.appendChild(clipStrengthLabel);
-      headerRow.appendChild(infoHeaderSlot);
+      headerRow.appendChild(infoHeaderPair);
       headerRow.appendChild(deleteAllSlot);
 
       const rowsWrap = document.createElement("div");
@@ -1615,8 +1695,11 @@ app.registerExtension({
               persist();
               render();
             },
-            onInfo: (loraPath) => {
-              openCivitaiLoraInfo(loraPath);
+            onInfoToolkit: (loraPath) => {
+              openCivitaiToolkitLoraInfo(loraPath);
+            },
+            onInfoFull: (loraPath) => {
+              openPysssssLoraInfo(loraPath, node);
             },
             showClipStrength,
             currentPriority: idx + 1,
