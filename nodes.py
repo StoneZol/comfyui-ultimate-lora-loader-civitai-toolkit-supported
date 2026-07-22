@@ -1,17 +1,13 @@
 """
-Ultimate Lora Loader for ComfyUI
---------------------------------
-A Power-Lora-Loader-style node (dynamic list of LoRAs, each with its own
-enabled/strength controls) whose "Add Lora" picker shows your actual
-on-disk folder structure instead of a flattened list of
-"subfolder/name.safetensors" strings.
+Ultimate Lora Loader (Civitai) for ComfyUI
+------------------------------------------
+Fork of Ultimate Lora Loader with per-row Civitai Toolkit info support.
 
 Files:
-  nodes.py                  <- this file (backend node + API route)
-  js/ultimate_lora_loader.js <- frontend widget (button, popup tree browser, per-row UI)
+  nodes.py                              <- this file (backend node + API route)
+  js/ultimate_lora_loader_civitai.js    <- frontend widget + Civitai info modal
 """
 
-import os
 import folder_paths
 import comfy.sd
 import comfy.utils
@@ -68,10 +64,14 @@ def _build_lora_tree():
 
 
 # ---------------------------------------------------------------------------
-# API route: GET /ultimate_lora_loader/tree
+# API route: GET /ultimate_lora_loader_civitai/tree
+# Guarded so a duplicate install of this package doesn't crash ComfyUI
+# with "method HEAD is already registered".
 # ---------------------------------------------------------------------------
 
-@PromptServer.instance.routes.get("/ultimate_lora_loader/tree")
+_TREE_ROUTE = "/ultimate_lora_loader_civitai/tree"
+
+
 async def get_lora_tree(request):
     try:
         tree = _build_lora_tree()
@@ -80,11 +80,21 @@ async def get_lora_tree(request):
         return web.json_response({"error": str(e)}, status=500)
 
 
+_existing_paths = {getattr(r, "path", None) for r in PromptServer.instance.routes}
+if _TREE_ROUTE not in _existing_paths:
+    PromptServer.instance.routes.get(_TREE_ROUTE)(get_lora_tree)
+else:
+    print(
+        f"[UltimateLoraLoaderCivitai] Route {_TREE_ROUTE} already registered "
+        "(duplicate custom_nodes install?). Skipping."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Node
 # ---------------------------------------------------------------------------
 
-class UltimateLoraLoader:
+class UltimateLoraLoaderCivitai:
     """
     Dynamic-stack LoRA loader. The list of loras is stored as a single
     JSON-serialized widget value ("loras_data") that the JS frontend
@@ -92,7 +102,7 @@ class UltimateLoraLoader:
     reads that JSON and applies each enabled entry in order.
     """
 
-    NODE_NAME = "Ultimate Lora Loader"
+    NODE_NAME = "Ultimate Lora Loader (Civitai)"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -153,7 +163,7 @@ class UltimateLoraLoader:
 
             lora_path = folder_paths.get_full_path("loras", lora_name)
             if lora_path is None:
-                print(f"[UltimateLoraLoader] Could not find lora: {lora_name}, skipping.")
+                print(f"[UltimateLoraLoaderCivitai] Could not find lora: {lora_name}, skipping.")
                 continue
 
             lora_sd = comfy.utils.load_torch_file(lora_path, safe_load=True)
@@ -166,9 +176,9 @@ class UltimateLoraLoader:
 
 
 NODE_CLASS_MAPPINGS = {
-    "UltimateLoraLoader": UltimateLoraLoader,
+    "UltimateLoraLoaderCivitai": UltimateLoraLoaderCivitai,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "UltimateLoraLoader": "Ultimate Lora Loader",
+    "UltimateLoraLoaderCivitai": "Ultimate Lora Loader (Civitai)",
 }

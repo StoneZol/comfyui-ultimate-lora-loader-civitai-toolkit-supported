@@ -1,7 +1,7 @@
 [project]
-name = "ultimate-lora-loader"
-description = "A Power-Lora-Loader-style dynamic LoRA stack node with a real on-disk folder browser, drag-to-reorder, optional CLIP, and per-lora split model/clip strengths."
-version = "1.1.0"
+name = "ultimate-lora-loader-civitai"
+description = "Fork of Ultimate Lora Loader with per-row Civitai Toolkit info: folder browser, drag-to-reorder, optional CLIP, and a ? button that opens Toolkit's Civitai model info modal."
+version = "1.2.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = []
@@ -12,5 +12,5 @@ Repository = "https://github.com/WaitWut/comfyui-ultimate-lora-loader"
 
 [tool.comfy]
 PublisherId = "waitwut"
-DisplayName = "Ultimate Lora Loader"
+DisplayName = "Ultimate Lora Loader (Civitai)"
 Icon = ""

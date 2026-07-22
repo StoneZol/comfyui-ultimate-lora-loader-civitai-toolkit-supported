@@ -8,7 +8,7 @@ import { api } from "../../../scripts/api.js";
 // on the add-lora button — this is what actually fixes the rgthree overflow bug,
 // where the button's own padding/border pushed it past the node's rounded edge.
 
-const STYLE_ID = "ultimate-lora-loader-styles";
+const STYLE_ID = "ultimate-lora-loader-civitai-styles";
 if (!document.getElementById(STYLE_ID)) {
   const style = document.createElement("style");
   style.id = STYLE_ID;
@@ -400,8 +400,382 @@ if (!document.getElementById(STYLE_ID)) {
       color: #888;
       text-align: center;
     }
+
+    /* --- Civitai info button --- */
+    .fll-info {
+      flex: 0 0 20px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      user-select: none;
+    }
+    .fll-info:hover {
+      background: #3a3a3e;
+      color: #a78bfa;
+    }
+    .fll-header-info-slot {
+      flex: 0 0 20px;
+      width: 20px;
+    }
+
+    /* --- Civitai Toolkit-compatible info popup --- */
+    .ullc-civitai-popup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.75);
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+    .ullc-civitai-popup .popup-content {
+      background: var(--comfy-menu-bg, #2a2a2e);
+      padding: 0;
+      border-radius: 8px;
+      max-width: 800px;
+      width: 95%;
+      border: 1px solid var(--border-color, #444);
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .ullc-civitai-popup .popup-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border-color, #444);
+    }
+    .ullc-civitai-popup .popup-header h2 {
+      margin: 0;
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--fg-color, #ddd);
+      font-size: 1.15em;
+    }
+    .ullc-civitai-popup .popup-close {
+      font-size: 28px;
+      cursor: pointer;
+      color: var(--fg-color, #ddd);
+      margin-left: 15px;
+      line-height: 1;
+    }
+    .ullc-civitai-popup .popup-close:hover { color: #f44; }
+    .ullc-civitai-popup .popup-body {
+      overflow-y: auto;
+      word-break: break-word;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      color: var(--fg-color, #ddd);
+    }
+    .ullc-civitai-popup .model-description-content {
+      font-size: 13px;
+      background: rgba(0,0,0,0.2);
+      padding: 12px;
+      border-radius: 5px;
+    }
+    .ullc-civitai-popup .model-description-content.version-desc {
+      background: rgba(80, 80, 0, 0.2);
+    }
+    .ullc-civitai-popup .model-description-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    .ullc-civitai-popup .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .ullc-civitai-popup .info-item {
+      background: var(--comfy-box-bg, #1c1c1f);
+      padding: 8px;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+    .ullc-civitai-popup .info-item strong {
+      color: var(--desc-text-color, #999);
+      margin-right: 8px;
+    }
+    .ullc-civitai-popup .info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ullc-civitai-popup .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ullc-civitai-popup h4 { margin: 0; }
+    .ullc-civitai-popup .detail-tags,
+    .ullc-civitai-popup .triggers-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ullc-civitai-popup .detail-tag {
+      background: var(--comfy-input-bg, #333);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+    .ullc-civitai-popup .trigger-word {
+      background: var(--comfy-input-bg, #333);
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border-color, #444);
+      cursor: pointer;
+      user-select: none;
+    }
+    .ullc-civitai-popup .trigger-word:hover {
+      border-color: var(--accent-color, #a78bfa);
+      color: var(--accent-color, #a78bfa);
+    }
+    .ullc-civitai-popup .trigger-word.copied {
+      border-color: #5f9;
+      color: #5f9;
+    }
+    .ullc-civitai-popup .copy-btn,
+    .ullc-civitai-popup .copy-all-btn {
+      background: var(--comfy-input-bg, #333);
+      border: 1px solid var(--border-color, #444);
+      color: var(--input-text-color, #ddd);
+      padding: 4px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .ullc-civitai-popup .copy-btn:hover,
+    .ullc-civitai-popup .copy-all-btn:hover {
+      border-color: var(--accent-color, #a78bfa);
+      color: var(--accent-color, #a78bfa);
+    }
+    .ullc-civitai-popup .copy-btn.copied,
+    .ullc-civitai-popup .copy-all-btn.copied {
+      border-color: #5f9;
+      color: #5f9;
+    }
+    .ullc-civitai-popup .description-details summary {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    .ullc-civitai-popup .hash-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--comfy-box-bg, #1c1c1f);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .ullc-civitai-popup .hash-section strong { flex-shrink: 0; }
+    .ullc-civitai-popup .hash-code {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   `;
   document.head.appendChild(style);
+}
+
+// ---------------------------------------------------------------------------
+// Civitai Toolkit model info (soft dependency on /civitai_utils/*)
+// ---------------------------------------------------------------------------
+
+let _civitaiModelsCache = null;
+let _civitaiModelsCacheTime = 0;
+const CIVITAI_MODELS_CACHE_MS = 60000;
+
+function _normPath(p) {
+  return String(p || "").replace(/\\/g, "/").toLowerCase();
+}
+
+async function fetchCivitaiLocalModels(force = false) {
+  const now = Date.now();
+  if (!force && _civitaiModelsCache && now - _civitaiModelsCacheTime < CIVITAI_MODELS_CACHE_MS) {
+    return _civitaiModelsCache;
+  }
+  const res = await api.fetchApi("/civitai_utils/get_local_models");
+  if (!res.ok) {
+    throw new Error(`Civitai Toolkit API HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  if (data.status !== "ok" || !Array.isArray(data.models)) {
+    throw new Error(data.message || "Civitai Toolkit returned no models");
+  }
+  _civitaiModelsCache = data.models;
+  _civitaiModelsCacheTime = now;
+  return _civitaiModelsCache;
+}
+
+function findCivitaiModel(models, loraPath) {
+  const target = _normPath(loraPath);
+  const basename = target.split("/").pop();
+  const loras = models.filter((m) => String(m.model_type || "").toLowerCase() === "loras");
+  const pool = loras.length ? loras : models;
+  return (
+    pool.find((m) => _normPath(m.filename) === target) ||
+    pool.find((m) => {
+      const f = _normPath(m.filename);
+      return f === basename || f.endsWith("/" + basename);
+    }) ||
+    null
+  );
+}
+
+function createCivitaiModelInfoPopup(title, model) {
+  const existing = document.querySelector(".ullc-civitai-popup");
+  if (existing) existing.remove();
+
+  const popup = document.createElement("div");
+  popup.className = "ullc-civitai-popup";
+  const data = model;
+
+  const copyToClipboard = (text, targetElement) => {
+    navigator.clipboard.writeText(text).then(() => {
+      const originalText = targetElement.innerHTML;
+      targetElement.innerHTML = "Copied!";
+      targetElement.classList.add("copied");
+      setTimeout(() => {
+        targetElement.innerHTML = originalText;
+        targetElement.classList.remove("copied");
+      }, 1500);
+    }).catch((err) => console.error("[UltimateLoraLoaderCivitai] copy failed:", err));
+  };
+
+  const parseHtml = (htmlString) =>
+    new DOMParser().parseFromString(htmlString, "text/html").body.innerHTML;
+
+  const versionDescriptionHTML = data.version_description
+    ? parseHtml(data.version_description)
+    : "";
+  const modelDescriptionHTML = data.model_description
+    ? parseHtml(data.model_description)
+    : "<em>No description available.</em>";
+
+  const triggersHTML =
+    data.trained_words && data.trained_words.length > 0
+      ? data.trained_words
+          .map((tag) => `<code class="trigger-word" title="Click to copy">${tag}</code>`)
+          .join("")
+      : "<em>None specified</em>";
+
+  const copyAllTriggersBtn =
+    data.trained_words && data.trained_words.length > 0
+      ? `<button class="copy-all-btn" data-text="${data.trained_words.join(", ")}">Copy All</button>`
+      : "";
+
+  const tagsHTML =
+    data.tags && data.tags.length > 0
+      ? `<div class="detail-tags">${data.tags.map((tag) => `<span class="detail-tag">${tag}</span>`).join("")}</div>`
+      : "<em>No tags found.</em>";
+
+  const ratingText =
+    data.civitai_stats?.rating !== undefined
+      ? `${data.civitai_stats.rating.toFixed(1)} (${data.civitai_stats.ratingCount})`
+      : `👍 ${data.civitai_stats?.thumbsUpCount || 0}`;
+
+  popup.innerHTML = `
+    <div class="popup-content">
+      <div class="popup-header">
+        <h2>${title}</h2>
+        <span class="popup-close" title="Close">&times;</span>
+      </div>
+      <div class="popup-body">
+        <div class="info-grid">
+          <div class="info-item"><strong>Civitai Name:</strong> <span>${data.civitai_model_name || "N/A"}</span></div>
+          <div class="info-item"><strong>Version:</strong> <span>${data.version_name || "N/A"}</span></div>
+          <div class="info-item"><strong>Base Model:</strong> <span>${data.base_model || "N/A"}</span></div>
+          <div class="info-item"><strong>Downloads:</strong> <span>${data.civitai_stats?.downloadCount || 0}</span></div>
+          <div class="info-item"><strong>Rating:</strong> <span>${ratingText}</span></div>
+        </div>
+        <div class="info-section">
+          <h4>Tags</h4>
+          ${tagsHTML}
+        </div>
+        <div class="info-section">
+          <div class="section-header">
+            <h4>Trigger Words</h4>
+            ${copyAllTriggersBtn}
+          </div>
+          <div class="triggers-container">${triggersHTML}</div>
+        </div>
+        ${
+          versionDescriptionHTML
+            ? `<div class="info-section">
+                <h4>Version Description</h4>
+                <div class="model-description-content version-desc">${versionDescriptionHTML}</div>
+              </div>`
+            : ""
+        }
+        <div class="info-section">
+          <details class="description-details" open>
+            <summary>Model Description</summary>
+            <div class="model-description-content">${modelDescriptionHTML}</div>
+          </details>
+        </div>
+        <div class="info-section hash-section">
+          <strong>Hash:</strong>
+          <code class="hash-code">${data.hash || "N/A"}</code>
+          <button class="copy-btn" data-text="${data.hash || ""}">Copy</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(popup);
+
+  const close = () => popup.remove();
+  popup.querySelector(".popup-close").onclick = close;
+  popup.onclick = (e) => {
+    if (e.target === popup) close();
+  };
+
+  popup.querySelectorAll(".trigger-word").forEach((el) => {
+    el.onclick = () => copyToClipboard(el.textContent, el);
+  });
+  const copyAllBtn = popup.querySelector(".copy-all-btn");
+  if (copyAllBtn) {
+    copyAllBtn.onclick = (e) => copyToClipboard(e.target.dataset.text, e.target);
+  }
+  const copyHashBtn = popup.querySelector(".hash-section .copy-btn");
+  if (copyHashBtn) {
+    copyHashBtn.onclick = (e) => copyToClipboard(e.target.dataset.text, e.target);
+  }
+}
+
+async function openCivitaiLoraInfo(loraPath) {
+  const displayName = String(loraPath || "").split(/[/\\]/).pop() || loraPath;
+  try {
+    const models = await fetchCivitaiLocalModels();
+    const model = findCivitaiModel(models, loraPath);
+    if (!model) {
+      alert(
+        `Civitai Toolkit has no info for:\n${loraPath}\n\nMake sure the Toolkit scan finished and this LoRA is indexed.`
+      );
+      return;
+    }
+    createCivitaiModelInfoPopup(displayName, model);
+  } catch (e) {
+    console.error("[UltimateLoraLoaderCivitai] Civitai info failed:", e);
+    alert(
+      `Could not open Civitai info.\nIs Civitai Toolkit installed and loaded?\n\n${e.message || e}`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -458,14 +832,14 @@ async function fetchLoraTree(force = false) {
     return _treeCache;
   }
   try {
-    const res = await api.fetchApi("/ultimate_lora_loader/tree");
+    const res = await api.fetchApi("/ultimate_lora_loader_civitai/tree");
     const data = await res.json();
     _treeCache = data;
     _treeCacheTime = now;
     _rebuildValidLoraPaths(data);
     return data;
   } catch (e) {
-    console.error("[UltimateLoraLoader] Failed to fetch lora tree", e);
+    console.error("[UltimateLoraLoaderCivitai] Failed to fetch lora tree", e);
     return _treeCache || { __files__: [] };
   }
 }
@@ -627,7 +1001,7 @@ function openLoraBrowser(x, y, onSelect) {
 // Node widget
 // ---------------------------------------------------------------------------
 
-function makeRow(entry, { onChange, onRemove, onReplace, showClipStrength, onDragStart, onDragOver, onDrop, onDragEnd, onPriorityChange, currentPriority }) {
+function makeRow(entry, { onChange, onRemove, onReplace, onInfo, showClipStrength, onDragStart, onDragOver, onDrop, onDragEnd, onPriorityChange, currentPriority }) {
   const row = document.createElement("div");
   row.className = rowClassName(entry);
   // Row itself isn't draggable - only the dedicated drag handle icon
@@ -906,6 +1280,15 @@ function makeRow(entry, { onChange, onRemove, onReplace, showClipStrength, onDra
     );
   }
 
+  const info = document.createElement("div");
+  info.className = "fll-info";
+  info.textContent = "?";
+  info.title = "View Civitai info (requires Civitai Toolkit)";
+  info.onclick = (e) => {
+    e.stopPropagation();
+    onInfo?.(entry.lora);
+  };
+
   const remove = document.createElement("div");
   remove.className = "fll-remove";
   remove.innerHTML = TRASH_ICON_SVG;
@@ -917,6 +1300,7 @@ function makeRow(entry, { onChange, onRemove, onReplace, showClipStrength, onDra
   row.appendChild(name);
   row.appendChild(modelStrength);
   if (clipStrength) row.appendChild(clipStrength);
+  row.appendChild(info);
   row.appendChild(remove);
 
   return row;
@@ -938,10 +1322,10 @@ const TRASH_ICON_SVG = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/s
 </svg>`;
 
 app.registerExtension({
-  name: "ultimate.lora.loader",
+  name: "ultimate.lora.loader.civitai",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData.name !== "UltimateLoraLoader") return;
+    if (nodeData.name !== "UltimateLoraLoaderCivitai") return;
 
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
@@ -1098,12 +1482,16 @@ app.registerExtension({
       deleteAllSlot.className = "fll-header-remove-slot";
       deleteAllSlot.innerHTML = TRASH_ICON_SVG;
 
+      const infoHeaderSlot = document.createElement("div");
+      infoHeaderSlot.className = "fll-header-info-slot";
+
       headerRow.appendChild(dragHandleSpacer);
       headerRow.appendChild(priorityLabel);
       headerRow.appendChild(toggleAllSlot);
       headerRow.appendChild(nameLabel);
       headerRow.appendChild(strengthLabel);
       headerRow.appendChild(clipStrengthLabel);
+      headerRow.appendChild(infoHeaderSlot);
       headerRow.appendChild(deleteAllSlot);
 
       const rowsWrap = document.createElement("div");
@@ -1150,6 +1538,9 @@ app.registerExtension({
               entry.lora = loraPath;
               persist();
               render();
+            },
+            onInfo: (loraPath) => {
+              openCivitaiLoraInfo(loraPath);
             },
             showClipStrength,
             currentPriority: idx + 1,
