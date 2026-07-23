@@ -85,4 +85,4 @@ Please include ComfyUI version, Civitai Toolkit / Custom Scripts versions, and a
 - Toolkit local info: [BAIKEMARK / ComfyUI-Civitai-Toolkit](https://github.com/BAIKEMARK/ComfyUI-Civitai-Toolkit) (tested with **4.1.3**)
 - Full View Lora info dialog: [pythongosssss / ComfyUI-Custom-Scripts](https://github.com/pythongosssss/ComfyUI-Custom-Scripts) (tested with **1.2.5**)
 
-MIT — see [LICENSE](LICENSE). Original copyright [WaitWut](https://github.com/WaitWut/comfyui-ultimate-lora-loader); fork modifications © StoneZol.
+MIT — see [LICENSE](LICENSE). Original copyright [WaitWut](https://github.com/WaitWut/comfyui-ultimate-lora-loader); fork modifications © StoneZol
