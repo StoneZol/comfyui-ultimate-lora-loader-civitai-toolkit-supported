@@ -11,7 +11,7 @@ Repository = "https://github.com/StoneZol/comfyui-ultimate-lora-loader-civitai-t
 "Bug Tracker" = "https://github.com/StoneZol/comfyui-ultimate-lora-loader-civitai-toolkit-supported/issues"
 
 [tool.comfy]
-PublisherId = "stonezol"
+PublisherId = "stone-zol"
 DisplayName = "Ultimate Lora Loader (Civitai)"
 Icon = ""
 
