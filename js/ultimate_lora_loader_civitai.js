@@ -1,7 +1,14 @@
 import { app } from "../../../scripts/app.js";
 import { loadConfig } from "./ullc/config.js";
 import { injectStyles } from "./ullc/styles.js";
-import { openCivitaiToolkitLoraInfo } from "./ullc/civitai_toolkit_info.js";
+import {
+  clearEntryDisplay,
+  openCivitaiToolkitLoraInfo,
+  onCivitaiMetaReady,
+  prefetchCivitaiMeta,
+  seedEntryDisplay,
+  syncEntriesDisplayFromCache,
+} from "./ullc/civitai_toolkit_info.js";
 import { openPysssssLoraInfo } from "./ullc/pysssss_info.js";
 import { fetchLoraTree } from "./ullc/lora_tree.js";
 import { openLoraBrowser } from "./ullc/lora_browser.js";
@@ -235,6 +242,8 @@ app.registerExtension({
             },
             onReplace: (loraPath) => {
               entry.lora = loraPath;
+              clearEntryDisplay(entry);
+              seedEntryDisplay(entry);
               persist();
               render();
             },
@@ -518,12 +527,14 @@ app.registerExtension({
         e.stopPropagation();
         const rect = addBtn.getBoundingClientRect();
         openLoraBrowser(rect.left, rect.bottom + 4, (loraPath) => {
-          entries.push({
+          const newEntry = {
             lora: loraPath,
             enabled: true,
             strengthModel: 1.0,
             strengthClip: 1.0,
-          });
+          };
+          seedEntryDisplay(newEntry);
+          entries.push(newEntry);
           persist();
           render();
           resizeNode();
@@ -542,6 +553,19 @@ app.registerExtension({
 
       render();
       syncWidth();
+
+      // Background: when Toolkit index is ready/refreshed, update persisted
+      // display fields only if something changed — then one re-render.
+      // Subsequent Comfy loads paint instantly from loras_data (no flicker).
+      const unsubMeta = onCivitaiMetaReady(() => {
+        if (syncEntriesDisplayFromCache(entries)) {
+          persist();
+          render();
+        }
+      });
+
+      // Warm Toolkit index once (shared promise + path map).
+      prefetchCivitaiMeta();
 
       // Fetch the on-disk lora list so missing-file highlighting can light up
       // once we know what actually exists. The paint above happens first and
@@ -572,6 +596,7 @@ app.registerExtension({
 
       const onRemoved = node.onRemoved;
       node.onRemoved = function () {
+        unsubMeta?.();
         if (lorasWidgetObserver) {
           lorasWidgetObserver.disconnect();
           lorasWidgetObserver = null;
