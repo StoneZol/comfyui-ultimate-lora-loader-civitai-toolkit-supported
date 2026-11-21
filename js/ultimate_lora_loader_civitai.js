@@ -10,7 +10,7 @@ import {
   syncEntriesDisplayFromCache,
 } from "./ullc/civitai_toolkit_info.js";
 import { openPysssssLoraInfo } from "./ullc/pysssss_info.js";
-import { fetchLoraTree } from "./ullc/lora_tree.js";
+import { fetchLoraTree, healMissingLoraPaths } from "./ullc/lora_tree.js";
 import { openLoraBrowser } from "./ullc/lora_browser.js";
 import { makeRow } from "./ullc/lora_row.js";
 import { TRASH_ICON_SVG } from "./ullc/icons.js";
@@ -206,9 +206,46 @@ app.registerExtension({
       rowsWrap.style.gap = "4px";
       rowsWrap.style.boxSizing = "border-box";
 
+      const addSection = document.createElement("div");
+      addSection.className = "fll-add-section";
+
       const addBtn = document.createElement("div");
       addBtn.className = "fll-add-btn";
       addBtn.innerHTML = `<span>Add Lora</span>`;
+
+      const healNotice = document.createElement("div");
+      healNotice.className = "fll-heal-notice";
+      healNotice.style.display = "none";
+      const healNoticeText = document.createElement("div");
+      healNoticeText.className = "fll-heal-notice-text";
+      const healNoticeClose = document.createElement("div");
+      healNoticeClose.className = "fll-heal-notice-close";
+      healNoticeClose.textContent = "×";
+      healNoticeClose.title = "Dismiss";
+      healNoticeClose.onclick = (e) => {
+        e.stopPropagation();
+        hideHealNotice();
+      };
+      healNotice.appendChild(healNoticeText);
+      healNotice.appendChild(healNoticeClose);
+      addSection.appendChild(addBtn);
+      addSection.appendChild(healNotice);
+
+      function showHealNotice(count) {
+        const n = Math.max(1, count | 0);
+        healNoticeText.textContent =
+          n === 1
+            ? "A LoRA path was auto-updated (file moved). Run Sync in Civitai Toolkit, then refresh the page so names/covers match."
+            : `${n} LoRA paths were auto-updated (files moved). Run Sync in Civitai Toolkit, then refresh the page so names/covers match.`;
+        healNotice.style.display = "flex";
+        resizeNode();
+      }
+
+      function hideHealNotice() {
+        if (healNotice.style.display === "none") return;
+        healNotice.style.display = "none";
+        resizeNode();
+      }
 
       function persist() {
         if (dataWidget) {
@@ -369,6 +406,7 @@ app.registerExtension({
       const ROW_GAP = 4; // gap between rows in rowsWrap
       const HEADER_HEIGHT = 20; // .fll-header-row: toggle switch (16px) + row padding 2px*2 (4px)
       const ADD_BTN_HEIGHT = 28; // .fll-add-btn: ~14px text line + padding 6px*2 (12px) + border 1px*2 (2px)
+      const HEAL_NOTICE_HEIGHT = 48; // approx. two-line tip under Add Lora
       const CONTAINER_PADDING_V = 12; // .fll-container top+bottom padding (6+6)
       const SOCKET_ROWS_HEIGHT = 56; // title bar + model/clip socket rows above the DOM widget
       const GAP_BETWEEN_SECTIONS = 4; // .fll-container's own `gap` between header/rowsWrap/addBtn
@@ -379,6 +417,8 @@ app.registerExtension({
         const rowCount = entries.length;
         const rowsHeightFull = rowCount > 0 ? rowCount * ROW_HEIGHT + (rowCount - 1) * ROW_GAP : 0;
         const headerHeight = rowCount > 0 ? HEADER_HEIGHT + GAP_BETWEEN_SECTIONS : 0;
+        const healExtra =
+          healNotice.style.display !== "none" ? HEAL_NOTICE_HEIGHT + GAP_BETWEEN_SECTIONS : 0;
 
         // "Chrome" = everything in the column except the row list itself:
         // add button, header row (+ its gap), and container's own vertical
@@ -389,7 +429,12 @@ app.registerExtension({
         // left for rowsWrap once the node is smaller than that (floor /
         // manual resize).
         const chromeHeight =
-          ADD_BTN_HEIGHT + headerHeight + (rowCount > 0 ? GAP_BETWEEN_SECTIONS : 0) + CONTAINER_PADDING_V + BOTTOM_SLACK;
+          ADD_BTN_HEIGHT +
+          healExtra +
+          headerHeight +
+          (rowCount > 0 ? GAP_BETWEEN_SECTIONS : 0) +
+          CONTAINER_PADDING_V +
+          BOTTOM_SLACK;
 
         const minRowsVisible = Math.min(rowCount, MIN_VISIBLE_ROWS);
         const floorRowsHeight = minRowsVisible > 0 ? minRowsVisible * ROW_HEIGHT + (minRowsVisible - 1) * ROW_GAP : 0;
@@ -487,6 +532,23 @@ app.registerExtension({
         return r2;
       };
 
+      // Fetch on-disk lora list + auto-heal entries moved within loras/
+      // (unique basename match). Shared by create and workflow configure.
+      function refreshTreeAndHeal() {
+        return fetchLoraTree().then(() => {
+          const healed = healMissingLoraPaths(entries);
+          if (healed.length) {
+            for (const entry of healed) {
+              clearEntryDisplay(entry);
+              seedEntryDisplay(entry);
+            }
+            persist();
+            showHealNotice(healed.length);
+          }
+          render();
+        });
+      }
+
       // Re-neutralize the loras_data widget after workflow load/paste, since
       // onConfigure can rebuild widget state from serialized values.
       const onConfigure = node.onConfigure;
@@ -507,6 +569,9 @@ app.registerExtension({
         syncWidth();
         resizeNode();
         hideDataWidgetDom();
+        // Heal after entries are loaded from the workflow (create-time heal
+        // may have raced with an empty list before onConfigure ran).
+        refreshTreeAndHeal();
         return r3;
       };
 
@@ -542,7 +607,7 @@ app.registerExtension({
         });
       };
 
-      container.appendChild(addBtn);
+      container.appendChild(addSection);
       container.appendChild(headerRow);
       container.appendChild(rowsWrap);
 
@@ -567,12 +632,7 @@ app.registerExtension({
       // Warm Toolkit index once (shared promise + path map).
       prefetchCivitaiMeta();
 
-      // Fetch the on-disk lora list so missing-file highlighting can light up
-      // once we know what actually exists. The paint above happens first and
-      // flags nothing (validLoraPaths is null until this resolves); this
-      // re-render applies red highlighting to any rows pointing at files that
-      // are no longer present.
-      fetchLoraTree().then(() => render());
+      refreshTreeAndHeal();
 
       // restore size sanity on load (also re-syncs width once ComfyUI has
       // finished laying out the node on the canvas, in case initial

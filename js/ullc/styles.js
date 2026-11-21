@@ -369,6 +369,13 @@ const CSS = `    .fll-container {
       stroke-width: 1.6;
     }
 
+    .fll-add-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
     .fll-add-btn {
       display: flex;
       align-items: center;
@@ -389,6 +396,34 @@ const CSS = `    .fll-container {
     .fll-add-btn:hover {
       background: #3d3d43;
       border-color: #5a5a62;
+    }
+    .fll-heal-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #2a2840;
+      border: 1px solid #4a4568;
+      border-radius: 6px;
+      color: #c4b5fd;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .fll-heal-notice-text {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .fll-heal-notice-close {
+      flex: 0 0 auto;
+      cursor: pointer;
+      color: #888;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+      user-select: none;
+    }
+    .fll-heal-notice-close:hover {
+      color: #ddd;
     }
 
     /* --- Folder browser popup --- */
