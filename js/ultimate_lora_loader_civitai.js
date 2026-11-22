@@ -296,11 +296,10 @@ app.registerExtension({
 
       loadedRow.append(loadedInfo, reloadLoadedBtn, detachLoadedBtn);
 
-      let showPresetBar = true;
+      let showPresetBar = false;
 
       function applyPresetBarVisibility() {
         presetBar.hidden = !showPresetBar;
-        settingsBtn.classList.toggle("active", showPresetBar);
         paintLoaded();
         resizeNode();
       }

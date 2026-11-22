@@ -461,11 +461,6 @@ const CSS = `    .fll-container {
       border-color: #5a5a62;
       color: #ddd;
     }
-    .fll-settings-btn.active {
-      color: #c4b5fd;
-      border-color: #6d5aa8;
-      background: #2f2b3d;
-    }
     .fll-heal-notice {
       display: flex;
       align-items: flex-start;

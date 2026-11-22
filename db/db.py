@@ -506,8 +506,8 @@ def delete_category(name: str) -> Dict:
 # Prefs persisted in settings (shared across all nodes of this install).
 UI_PREF_DEFAULTS = {
     "skipDisabledOnSave": False,
-    # When False, Load / Save / Manage are hidden on the node (gear toggles).
-    "showPresetBar": True,
+    # When False, Load / Save / Manage (+ loaded chip) are hidden (gear → Settings).
+    "showPresetBar": False,
 }
 
 

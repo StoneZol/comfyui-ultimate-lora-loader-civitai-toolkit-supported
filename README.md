@@ -19,9 +19,9 @@ Everything from the base node still works (folder browser, optional CLIP, drag-t
 
 Tested with **Civitai Toolkit 4.1.3** and **ComfyUI-Custom-Scripts 1.2.5**.
 
-**Latest:** [1.3.0 — recursive search grouped by folder](docs/1.3.0/CHANGELOG.md)
+**Latest:** [1.4.0 — LoRA presets](docs/1.4.0/CHANGELOG.md)
 
-![1.3.0 search](docs/1.3.0/0.png)
+![1.4.0 presets](docs/1.4.0/1.png)
 
 ![prev](docs/nev0.png)
 
