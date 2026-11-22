@@ -1,4 +1,4 @@
-import { CHEVRON_ICON_SVG } from "./icons.js";
+import { CHEVRON_ICON_SVG, LOAD_ICON_SVG, PLUS_ICON_SVG } from "./icons.js";
 import { listPresets } from "./presets_api.js";
 import {
   cloneEntries,
@@ -63,16 +63,11 @@ function makePresetCard(preset, onApply) {
   const n = (preset.entries || []).length;
   meta.textContent = `${n} LoRA${n === 1 ? "" : "s"}`;
 
-  head.append(name, meta);
-
-  const actions = document.createElement("div");
-  actions.className = "ullc-preset-card-actions";
-
   const replaceBtn = document.createElement("button");
   replaceBtn.type = "button";
-  replaceBtn.className = "ullc-preset-btn primary sm";
-  replaceBtn.textContent = "Replace";
+  replaceBtn.className = "ullc-preset-icon-btn";
   replaceBtn.title = "Replace entire stack";
+  replaceBtn.innerHTML = LOAD_ICON_SVG;
   replaceBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     onApply?.(preset, "replace");
@@ -80,16 +75,16 @@ function makePresetCard(preset, onApply) {
 
   const mergeBtn = document.createElement("button");
   mergeBtn.type = "button";
-  mergeBtn.className = "ullc-preset-btn sm";
-  mergeBtn.textContent = "Merge";
-  mergeBtn.title = "Add missing LoRAs (skip duplicates)";
+  mergeBtn.className = "ullc-preset-icon-btn";
+  mergeBtn.title = "Merge — add missing LoRAs (skip duplicates)";
+  mergeBtn.innerHTML = PLUS_ICON_SVG;
   mergeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     onApply?.(preset, "merge");
   });
 
-  actions.append(replaceBtn, mergeBtn);
-  card.append(head, actions);
+  head.append(name, meta, replaceBtn, mergeBtn);
+  card.appendChild(head);
 
   if ((preset.description || "").trim()) {
     const desc = document.createElement("div");
@@ -213,7 +208,7 @@ export function openLoadPresetDialog({ currentEntries, onLoad } = {}) {
             return;
           }
           presets = res.presets || [];
-          status.textContent = `${presets.length} preset${presets.length === 1 ? "" : "s"} · Replace = full stack · Merge skips duplicates`;
+          status.textContent = `${presets.length} preset${presets.length === 1 ? "" : "s"} · ⬆ replace · + merge (skip dupes)`;
           paint();
           requestAnimationFrame(() => search.focus());
         })

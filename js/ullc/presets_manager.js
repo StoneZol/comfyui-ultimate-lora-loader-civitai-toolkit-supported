@@ -268,6 +268,7 @@ function openEditPresetDialog(preset, { onSaved } = {}) {
 }
 
 function makePresetRow(preset, { onEdit, onDelete }) {
+  // Same card layout as Load: name · meta · icon actions in one row.
   const row = document.createElement("div");
   row.className = "ullc-preset-card";
 
@@ -282,11 +283,6 @@ function makePresetRow(preset, { onEdit, onDelete }) {
   meta.className = "ullc-preset-card-meta";
   const n = (preset.entries || []).length;
   meta.textContent = `${n} LoRA${n === 1 ? "" : "s"}`;
-
-  head.append(name, meta);
-
-  const actions = document.createElement("div");
-  actions.className = "ullc-preset-card-actions";
 
   const edit = document.createElement("button");
   edit.type = "button";
@@ -308,8 +304,16 @@ function makePresetRow(preset, { onEdit, onDelete }) {
     onDelete?.(preset);
   });
 
-  actions.append(edit, del);
-  row.append(head, actions);
+  head.append(name, meta, edit, del);
+  row.appendChild(head);
+
+  if ((preset.description || "").trim()) {
+    const desc = document.createElement("div");
+    desc.className = "ullc-preset-card-desc";
+    desc.textContent = preset.description.trim();
+    row.appendChild(desc);
+  }
+
   return row;
 }
 
@@ -326,11 +330,17 @@ function appendManageTree(host, node, handlers, depth = 0, { expandAll = false }
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "ullc-preset-folder-toggle";
-    toggle.innerHTML = CHEVRON_ICON_SVG;
     toggle.addEventListener("click", (e) => {
       e.stopPropagation();
       folder.classList.toggle("collapsed");
+      const open = !folder.classList.contains("collapsed");
+      toggle.title = open ? "Collapse" : "Expand";
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
     });
+
+    const chevron = document.createElement("span");
+    chevron.className = "ullc-preset-folder-chevron";
+    chevron.innerHTML = CHEVRON_ICON_SVG;
 
     const label = document.createElement("span");
     label.className = "ullc-preset-folder-name";
@@ -340,10 +350,19 @@ function appendManageTree(host, node, handlers, depth = 0, { expandAll = false }
     countEl.className = "ullc-preset-folder-count";
     countEl.textContent = String(treeTotal(child));
 
+    const open = !folder.classList.contains("collapsed");
+    toggle.title = open ? "Collapse" : "Expand";
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    toggle.append(chevron, label, countEl);
+
+    const actions = document.createElement("div");
+    actions.className = "ullc-preset-folder-actions";
+
     const renameBtn = document.createElement("button");
     renameBtn.type = "button";
-    renameBtn.className = "ullc-preset-btn sm";
-    renameBtn.textContent = "Rename";
+    renameBtn.className = "ullc-preset-icon-btn";
+    renameBtn.title = "Rename";
+    renameBtn.innerHTML = EDIT_ICON_SVG;
     renameBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       handlers.onRenameShelf?.(child.path);
@@ -351,15 +370,16 @@ function appendManageTree(host, node, handlers, depth = 0, { expandAll = false }
 
     const delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.className = "ullc-preset-btn sm danger";
-    delBtn.textContent = "Delete";
+    delBtn.className = "ullc-preset-icon-btn danger";
+    delBtn.title = "Delete";
+    delBtn.innerHTML = TRASH_ICON_SVG;
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       handlers.onDeleteShelf?.(child.path);
     });
 
-    head.append(toggle, label, countEl, renameBtn, delBtn);
-
+    actions.append(renameBtn, delBtn);
+    head.append(toggle, actions);
     const body = document.createElement("div");
     body.className = "ullc-preset-folder-body";
     appendManageTree(body, child, handlers, depth + 1, { expandAll });

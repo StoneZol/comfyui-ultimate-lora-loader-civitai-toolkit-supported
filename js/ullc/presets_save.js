@@ -50,15 +50,23 @@ export function openSavePresetDialog({ entries, loaded = null, onSaved } = {}) {
       desc.placeholder = "notes (optional)";
       desc.rows = 2;
 
-      const skipRow = document.createElement("label");
-      skipRow.className = "ullc-preset-check-row";
-      const skipToggle = document.createElement("input");
-      skipToggle.type = "checkbox";
-      skipToggle.className = "ullc-preset-check";
+      let skipDisabled = false;
+
+      const skipRow = document.createElement("div");
+      skipRow.className = "ullc-preset-toggle-row";
+      skipRow.title =
+        "When on, disabled rows are not written into the preset (saved in SQLite)";
+
+      const skipToggle = document.createElement("div");
+      skipToggle.className = "fll-toggle-switch";
+      skipToggle.setAttribute("role", "switch");
+      skipToggle.setAttribute("aria-checked", "false");
+      const skipKnob = document.createElement("div");
+      skipKnob.className = "fll-toggle-knob";
+      skipToggle.appendChild(skipKnob);
+
       const skipLabel = document.createElement("span");
       skipLabel.textContent = "Skip disabled LoRAs";
-      skipLabel.title =
-        "When on, disabled rows are not written into the preset (saved in SQLite)";
       skipRow.append(skipToggle, skipLabel);
 
       const enabledCount = entries.filter((e) => e?.enabled !== false).length;
@@ -67,21 +75,29 @@ export function openSavePresetDialog({ entries, loaded = null, onSaved } = {}) {
       const hint = document.createElement("div");
       hint.className = "ullc-preset-hint";
 
+      function setSkipDisabled(on) {
+        skipDisabled = !!on;
+        skipToggle.classList.toggle("on", skipDisabled);
+        skipToggle.setAttribute("aria-checked", skipDisabled ? "true" : "false");
+        refreshHint();
+      }
+
       function refreshHint() {
-        const n = skipToggle.checked ? enabledCount : entries.length;
+        const n = skipDisabled ? enabledCount : entries.length;
         let text = `${n} LoRA${n === 1 ? "" : "s"} will be saved`;
-        if (skipToggle.checked && disabledCount) {
+        if (skipDisabled && disabledCount) {
           text += ` · ${disabledCount} disabled skipped`;
-        } else if (!skipToggle.checked && disabledCount) {
+        } else if (!skipDisabled && disabledCount) {
           text += ` · includes ${disabledCount} disabled`;
         }
         hint.textContent = text;
       }
       refreshHint();
 
-      skipToggle.addEventListener("change", () => {
-        refreshHint();
-        updatePrefs({ skipDisabledOnSave: skipToggle.checked }).catch(() => {});
+      skipRow.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setSkipDisabled(!skipDisabled);
+        updatePrefs({ skipDisabledOnSave: skipDisabled }).catch(() => {});
       });
 
       const errorEl = document.createElement("div");
@@ -168,7 +184,7 @@ export function openSavePresetDialog({ entries, loaded = null, onSaved } = {}) {
         errorEl.textContent = overwrite ? "Overwriting…" : "Saving…";
         try {
           const prepared = await prepareEntriesForSave(entries, {
-            skipDisabled: skipToggle.checked,
+            skipDisabled,
           });
           if (!prepared.length) {
             errorEl.textContent = "Nothing to save — all LoRAs are disabled";
@@ -217,8 +233,7 @@ export function openSavePresetDialog({ entries, loaded = null, onSaved } = {}) {
       getPrefs()
         .then((res) => {
           if (res.ok && res.prefs?.skipDisabledOnSave) {
-            skipToggle.checked = true;
-            refreshHint();
+            setSkipDisabled(true);
           }
         })
         .catch(() => {});

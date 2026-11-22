@@ -1166,69 +1166,104 @@ const CSS = `    .fll-container {
       gap: 6px;
       padding-right: 2px;
     }
+    /* Folder tree — Prompt Craft nesting (indent + left rule, no boxed panels). */
     .ullc-preset-folder {
-      border: 1px solid #333;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #252528;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
     .ullc-preset-folder.collapsed > .ullc-preset-folder-body { display: none; }
     .ullc-preset-folder-head {
-      width: 100%;
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 8px;
+      width: 100%;
+      min-height: 28px;
+      padding: 0 4px;
       border: none;
-      background: #2c2c30;
-      color: inherit;
+      border-radius: 6px;
+      background: transparent;
+      color: #ddd;
       font: inherit;
+      font-size: 12px;
       cursor: pointer;
       text-align: left;
       box-sizing: border-box;
     }
-    .ullc-preset-folder-manage { cursor: default; }
-    .ullc-preset-folder-toggle {
-      border: none;
+    .ullc-preset-folder-head:hover {
+      background: #2a2a2e;
+    }
+    .ullc-preset-folder-manage {
+      cursor: default;
+    }
+    .ullc-preset-folder-manage:hover {
       background: transparent;
-      color: #aaa;
-      padding: 0;
-      width: 18px;
-      height: 18px;
+    }
+    .ullc-preset-folder-toggle {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      min-height: 28px;
+      padding: 0 4px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .ullc-preset-folder-toggle:hover {
+      background: #2a2a2e;
+    }
+    .ullc-preset-folder-actions {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .ullc-preset-folder-chevron {
+      flex: 0 0 14px;
+      width: 14px;
+      height: 14px;
+      color: #888;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
     }
-    .ullc-preset-folder-chevron,
-    .ullc-preset-folder-toggle svg {
+    .ullc-preset-folder-chevron svg,
+    .ullc-preset-folder-toggle .ullc-preset-folder-chevron svg {
       width: 14px;
       height: 14px;
-      display: inline-flex;
+      display: block;
       transition: transform 0.15s ease;
     }
-    .ullc-preset-folder.collapsed .ullc-preset-folder-chevron,
-    .ullc-preset-folder.collapsed .ullc-preset-folder-toggle svg {
+    .ullc-preset-folder.collapsed .ullc-preset-folder-chevron svg {
       transform: rotate(-90deg);
     }
     .ullc-preset-folder-name {
       flex: 1 1 auto;
       min-width: 0;
-      font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .ullc-preset-folder-count {
+      flex: 0 0 auto;
       color: #888;
       font-size: 11px;
-      margin-right: 4px;
     }
     .ullc-preset-folder-body {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      padding: 6px;
+      gap: 6px;
+    }
+    .ullc-preset-folder-body > .ullc-preset-folder {
+      margin-left: 10px;
+      padding-left: 8px;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
     }
     .ullc-preset-card {
       border: 1px solid #3a3a40;
@@ -1241,17 +1276,19 @@ const CSS = `    .fll-container {
     }
     .ullc-preset-card-head {
       display: flex;
-      align-items: baseline;
-      gap: 8px;
-      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
     }
     .ullc-preset-card-name {
+      flex: 1 1 auto;
+      min-width: 0;
       font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .ullc-preset-card-meta { color: #888; font-size: 11px; flex-shrink: 0; }
+    .ullc-preset-card-head .ullc-preset-icon-btn { flex: 0 0 auto; }
     .ullc-preset-card-actions {
       display: flex;
       gap: 4px;
@@ -1358,20 +1395,17 @@ const CSS = `    .fll-container {
     .ullc-preset-popup {
       max-width: min(780px, calc(100vw - 32px));
     }
-    .ullc-preset-check-row {
+    .ullc-preset-toggle-row {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 0 2px;
       cursor: pointer;
       user-select: none;
-      color: #ccc;
+      color: #aaa;
       font-size: 12px;
     }
-    .ullc-preset-check {
-      width: 14px;
-      height: 14px;
-      accent-color: #a78bfa;
-    }
+    .ullc-preset-toggle-row:hover { color: #ddd; }
 `;
 
 export function injectStyles(
