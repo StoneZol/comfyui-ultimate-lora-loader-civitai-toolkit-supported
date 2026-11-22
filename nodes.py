@@ -162,14 +162,26 @@ class UltimateLoraLoaderCivitai:
         import json
 
         try:
-            entries = json.loads(loras_data) if loras_data else []
+            raw = json.loads(loras_data) if loras_data else []
         except Exception:
+            raw = []
+
+        # New wire format: { "entries": [...], "loaded": {...} }.
+        # Legacy workflows still send a bare JSON array.
+        if isinstance(raw, dict):
+            entries = raw.get("entries") or []
+        elif isinstance(raw, list):
+            entries = raw
+        else:
             entries = []
 
         out_model = model
         out_clip = clip
 
         for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+
             if not entry.get("enabled", True):
                 continue
 

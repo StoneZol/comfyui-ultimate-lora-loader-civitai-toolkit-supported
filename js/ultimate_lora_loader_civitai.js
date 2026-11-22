@@ -13,7 +13,24 @@ import { openPysssssLoraInfo } from "./ullc/pysssss_info.js";
 import { fetchLoraTree, healMissingLoraPaths } from "./ullc/lora_tree.js";
 import { openLoraBrowser } from "./ullc/lora_browser.js";
 import { makeRow } from "./ullc/lora_row.js";
-import { TRASH_ICON_SVG } from "./ullc/icons.js";
+import {
+  CLOSE_ICON_SVG,
+  LOAD_ICON_SVG,
+  RESET_ICON_SVG,
+  SAVE_ICON_SVG,
+  TRASH_ICON_SVG,
+} from "./ullc/icons.js";
+import { openSavePresetDialog } from "./ullc/presets_save.js";
+import { openLoadPresetDialog } from "./ullc/presets_load.js";
+import { openManagePresetsDialog } from "./ullc/presets_manager.js";
+import { cloneEntries, enrichPresetEntries } from "./ullc/presets_enrich.js";
+import { listPresets } from "./ullc/presets_api.js";
+import {
+  normalizeLoaded,
+  parseLorasData,
+  serializeLorasData,
+} from "./ullc/presets_data.js";
+import { addEntryUnique, replaceEntryToEnd } from "./ullc/lora_stack.js";
 
 const config = await loadConfig();
 injectStyles(config.style_id);
@@ -112,7 +129,7 @@ app.registerExtension({
           const val = elm.value !== undefined ? elm.value : elm.textContent;
           if (
             typeof val === "string" &&
-            val.trim().startsWith("[") &&
+            (val.trim().startsWith("[") || val.trim().startsWith("{")) &&
             val.includes('"lora"') &&
             val.includes('"enabled"')
           ) {
@@ -130,10 +147,11 @@ app.registerExtension({
       }
 
       let entries = [];
-      try {
-        entries = dataWidget?.value ? JSON.parse(dataWidget.value) : [];
-      } catch (e) {
-        entries = [];
+      let loadedPreset = null;
+      {
+        const parsed = parseLorasData(dataWidget?.value);
+        entries = parsed.entries;
+        loadedPreset = parsed.loaded;
       }
 
       const container = document.createElement("div");
@@ -198,6 +216,9 @@ app.registerExtension({
       headerRow.appendChild(strengthLabel);
       headerRow.appendChild(clipStrengthLabel);
       headerRow.appendChild(infoHeaderPair);
+      const replaceHeaderSlot = document.createElement("div");
+      replaceHeaderSlot.className = "fll-header-replace-slot";
+      headerRow.appendChild(replaceHeaderSlot);
       headerRow.appendChild(deleteAllSlot);
 
       const rowsWrap = document.createElement("div");
@@ -209,50 +230,86 @@ app.registerExtension({
       const addSection = document.createElement("div");
       addSection.className = "fll-add-section";
 
+      const presetBar = document.createElement("div");
+      presetBar.className = "fll-preset-bar";
+
+      const loadPresetBtn = document.createElement("div");
+      loadPresetBtn.className = "fll-preset-btn";
+      loadPresetBtn.innerHTML = `${LOAD_ICON_SVG}<span>Load</span>`;
+      loadPresetBtn.title = "Load preset (Replace or Merge)";
+
+      const savePresetBtn = document.createElement("div");
+      savePresetBtn.className = "fll-preset-btn";
+      savePresetBtn.innerHTML = `${SAVE_ICON_SVG}<span>Save</span>`;
+      savePresetBtn.title = "Save current stack as preset";
+
+      const managePresetBtn = document.createElement("div");
+      managePresetBtn.className = "fll-preset-btn";
+      managePresetBtn.textContent = "Manage";
+      managePresetBtn.title = "Manage presets (edit / heal / swap missing)";
+
+      presetBar.append(loadPresetBtn, savePresetBtn, managePresetBtn);
+
       const addBtn = document.createElement("div");
       addBtn.className = "fll-add-btn";
       addBtn.innerHTML = `<span>Add Lora</span>`;
 
-      const healNotice = document.createElement("div");
-      healNotice.className = "fll-heal-notice";
-      healNotice.style.display = "none";
-      const healNoticeText = document.createElement("div");
-      healNoticeText.className = "fll-heal-notice-text";
-      const healNoticeClose = document.createElement("div");
-      healNoticeClose.className = "fll-heal-notice-close";
-      healNoticeClose.textContent = "×";
-      healNoticeClose.title = "Dismiss";
-      healNoticeClose.onclick = (e) => {
-        e.stopPropagation();
-        hideHealNotice();
-      };
-      healNotice.appendChild(healNoticeText);
-      healNotice.appendChild(healNoticeClose);
-      addSection.appendChild(addBtn);
-      addSection.appendChild(healNotice);
+      const loadedRow = document.createElement("div");
+      loadedRow.className = "fll-loaded-row";
+      loadedRow.hidden = true;
 
-      function showHealNotice(count) {
-        const n = Math.max(1, count | 0);
-        healNoticeText.textContent =
-          n === 1
-            ? "A LoRA path was auto-updated (file moved). Run Sync in Civitai Toolkit, then refresh the page so names/covers match."
-            : `${n} LoRA paths were auto-updated (files moved). Run Sync in Civitai Toolkit, then refresh the page so names/covers match.`;
-        healNotice.style.display = "flex";
-        resizeNode();
+      const loadedInfo = document.createElement("span");
+      loadedInfo.className = "fll-loaded-info";
+      const loadedLabel = document.createElement("span");
+      loadedLabel.className = "fll-loaded-label";
+      loadedInfo.appendChild(loadedLabel);
+
+      const reloadLoadedBtn = document.createElement("button");
+      reloadLoadedBtn.type = "button";
+      reloadLoadedBtn.className = "fll-loaded-reset";
+      reloadLoadedBtn.title = "Reload from saved preset";
+      reloadLoadedBtn.innerHTML = RESET_ICON_SVG;
+
+      const detachLoadedBtn = document.createElement("button");
+      detachLoadedBtn.type = "button";
+      detachLoadedBtn.className = "fll-loaded-clear";
+      detachLoadedBtn.title = "Detach loaded preset";
+      detachLoadedBtn.innerHTML = CLOSE_ICON_SVG;
+
+      loadedRow.append(loadedInfo, reloadLoadedBtn, detachLoadedBtn);
+
+      addSection.appendChild(presetBar);
+      addSection.appendChild(addBtn);
+      addSection.appendChild(loadedRow);
+
+      function paintLoaded() {
+        const name = (loadedPreset?.title || "").trim();
+        if (!name) {
+          loadedRow.hidden = true;
+          loadedLabel.textContent = "";
+          loadedLabel.removeAttribute("title");
+          return;
+        }
+        loadedRow.hidden = false;
+        loadedLabel.textContent = name;
+        const shelf = (loadedPreset?.category || "").trim();
+        loadedLabel.title = shelf ? `Loaded: ${shelf} / ${name}` : `Loaded: ${name}`;
       }
 
-      function hideHealNotice() {
-        if (healNotice.style.display === "none") return;
-        healNotice.style.display = "none";
+      function setLoaded(next) {
+        loadedPreset = normalizeLoaded(next);
+        paintLoaded();
         resizeNode();
       }
 
       function persist() {
         if (dataWidget) {
-          dataWidget.value = JSON.stringify(entries);
+          dataWidget.value = serializeLorasData(entries, loadedPreset);
         }
         node.setDirtyCanvas(true, true);
       }
+
+      paintLoaded();
 
       function isClipConnected() {
         // clip is an optional input now - only show its strength control
@@ -278,11 +335,13 @@ app.registerExtension({
               resizeNode();
             },
             onReplace: (loraPath) => {
-              entry.lora = loraPath;
-              clearEntryDisplay(entry);
-              seedEntryDisplay(entry);
+              const next = replaceEntryToEnd(entries, idx, loraPath);
+              if (!next) return;
+              clearEntryDisplay(next);
+              seedEntryDisplay(next);
               persist();
               render();
+              resizeNode();
             },
             onInfoToolkit: (loraPath) => {
               openCivitaiToolkitLoraInfo(loraPath);
@@ -406,7 +465,8 @@ app.registerExtension({
       const ROW_GAP = 4; // gap between rows in rowsWrap
       const HEADER_HEIGHT = 20; // .fll-header-row: toggle switch (16px) + row padding 2px*2 (4px)
       const ADD_BTN_HEIGHT = 28; // .fll-add-btn: ~14px text line + padding 6px*2 (12px) + border 1px*2 (2px)
-      const HEAL_NOTICE_HEIGHT = 48; // approx. two-line tip under Add Lora
+      const PRESET_BAR_HEIGHT = 28; // Load / Save / Manage row
+      const LOADED_ROW_HEIGHT = 24; // Loaded · chip under Add Lora
       const CONTAINER_PADDING_V = 12; // .fll-container top+bottom padding (6+6)
       const SOCKET_ROWS_HEIGHT = 56; // title bar + model/clip socket rows above the DOM widget
       const GAP_BETWEEN_SECTIONS = 4; // .fll-container's own `gap` between header/rowsWrap/addBtn
@@ -417,8 +477,9 @@ app.registerExtension({
         const rowCount = entries.length;
         const rowsHeightFull = rowCount > 0 ? rowCount * ROW_HEIGHT + (rowCount - 1) * ROW_GAP : 0;
         const headerHeight = rowCount > 0 ? HEADER_HEIGHT + GAP_BETWEEN_SECTIONS : 0;
-        const healExtra =
-          healNotice.style.display !== "none" ? HEAL_NOTICE_HEIGHT + GAP_BETWEEN_SECTIONS : 0;
+        const loadedExtra = !loadedRow.hidden
+          ? LOADED_ROW_HEIGHT + GAP_BETWEEN_SECTIONS
+          : 0;
 
         // "Chrome" = everything in the column except the row list itself:
         // add button, header row (+ its gap), and container's own vertical
@@ -429,8 +490,10 @@ app.registerExtension({
         // left for rowsWrap once the node is smaller than that (floor /
         // manual resize).
         const chromeHeight =
+          PRESET_BAR_HEIGHT +
+          GAP_BETWEEN_SECTIONS +
           ADD_BTN_HEIGHT +
-          healExtra +
+          loadedExtra +
           headerHeight +
           (rowCount > 0 ? GAP_BETWEEN_SECTIONS : 0) +
           CONTAINER_PADDING_V +
@@ -543,7 +606,6 @@ app.registerExtension({
               seedEntryDisplay(entry);
             }
             persist();
-            showHealNotice(healed.length);
           }
           render();
         });
@@ -560,10 +622,11 @@ app.registerExtension({
           w.draw = () => {};
           w.mouse = () => false;
         }
-        try {
-          entries = w?.value ? JSON.parse(w.value) : [];
-        } catch (e) {
-          entries = [];
+        {
+          const parsed = parseLorasData(w?.value);
+          entries = parsed.entries;
+          loadedPreset = parsed.loaded;
+          paintLoaded();
         }
         render();
         syncWidth();
@@ -588,6 +651,98 @@ app.registerExtension({
         return r4;
       };
 
+      function applyPresetEntries(nextEntries, meta = {}) {
+        entries.length = 0;
+        for (const entry of cloneEntries(nextEntries)) {
+          seedEntryDisplay(entry);
+          entries.push(entry);
+        }
+        // Replace rebinds to the loaded preset; Merge keeps the current bind.
+        if (meta.mode === "replace") setLoaded(meta.loaded || null);
+        persist();
+        paintLoaded();
+        render();
+        resizeNode();
+        hideDataWidgetDom();
+      }
+
+      async function reloadLoadedPreset() {
+        const title = (loadedPreset?.title || "").trim();
+        const category = (loadedPreset?.category || "").trim();
+        if (!title) return;
+        const result = await listPresets({ category });
+        if (!result.ok) {
+          console.error(config.log_prefix, result.error || "Failed to reload preset");
+          return;
+        }
+        const key = title.toLowerCase();
+        let preset = null;
+        if (loadedPreset?.id) {
+          preset = (result.presets || []).find((p) => p.id === loadedPreset.id) || null;
+        }
+        if (!preset) {
+          preset =
+            (result.presets || []).find(
+              (p) => (p.title || "").trim().toLowerCase() === key,
+            ) || null;
+        }
+        if (!preset) {
+          console.warn(config.log_prefix, "Loaded preset not found in SQLite");
+          return;
+        }
+        const { entries: next } = await enrichPresetEntries(preset.entries || []);
+        applyPresetEntries(next, {
+          mode: "replace",
+          loaded: {
+            id: preset.id,
+            title: preset.title || title,
+            category: preset.category || category,
+          },
+        });
+      }
+
+      loadPresetBtn.onclick = (e) => {
+        e.stopPropagation();
+        openLoadPresetDialog({
+          currentEntries: entries,
+          onLoad: (next, meta) => applyPresetEntries(next, meta),
+        });
+      };
+
+      savePresetBtn.onclick = (e) => {
+        e.stopPropagation();
+        openSavePresetDialog({
+          entries,
+          loaded: loadedPreset,
+          onSaved: (result) => {
+            setLoaded({
+              id: result.id,
+              title: result.title,
+              category: result.category,
+            });
+            persist();
+          },
+        });
+      };
+
+      managePresetBtn.onclick = (e) => {
+        e.stopPropagation();
+        openManagePresetsDialog();
+      };
+
+      reloadLoadedBtn.onclick = (e) => {
+        e.stopPropagation();
+        reloadLoadedPreset().catch((err) => {
+          console.error(config.log_prefix, err);
+        });
+      };
+
+      detachLoadedBtn.onclick = (e) => {
+        e.stopPropagation();
+        setLoaded(null);
+        persist();
+      };
+
       addBtn.onclick = (e) => {
         e.stopPropagation();
         const rect = addBtn.getBoundingClientRect();
@@ -598,8 +753,8 @@ app.registerExtension({
             strengthModel: 1.0,
             strengthClip: 1.0,
           };
+          if (!addEntryUnique(entries, newEntry)) return;
           seedEntryDisplay(newEntry);
-          entries.push(newEntry);
           persist();
           render();
           resizeNode();

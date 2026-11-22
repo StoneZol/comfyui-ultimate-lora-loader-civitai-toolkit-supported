@@ -1,10 +1,9 @@
 import { app } from "../../../scripts/app.js";
 import { isLoraMissing } from "./lora_tree.js";
 import { openLoraBrowser } from "./lora_browser.js";
-import { TRASH_ICON_SVG } from "./icons.js";
+import { IMAGE_ICON_SVG, REPLACE_ICON_SVG, TRASH_ICON_SVG } from "./icons.js";
 import { displayFieldsFromEntry, seedEntryDisplay } from "./civitai_toolkit_info.js";
 import { bindPreviewHover } from "./preview_tip.js";
-import { IMAGE_ICON_SVG } from "./icons.js";
 // ---------------------------------------------------------------------------
 // Node widget
 // ---------------------------------------------------------------------------
@@ -362,6 +361,17 @@ export function makeRow(entry, { onChange, onRemove, onReplace, onInfoToolkit, o
     onInfoFull?.(entry.lora);
   };
 
+  const replace = document.createElement("div");
+  replace.className = "fll-replace";
+  replace.innerHTML = REPLACE_ICON_SVG;
+  replace.title = "Replace LoRA";
+  replace.onclick = (e) => {
+    e.stopPropagation();
+    if (!onReplace) return;
+    const rect = replace.getBoundingClientRect();
+    openLoraBrowser(rect.left, rect.bottom + 4, (loraPath) => onReplace(loraPath));
+  };
+
   const remove = document.createElement("div");
   remove.className = "fll-remove";
   remove.innerHTML = TRASH_ICON_SVG;
@@ -376,6 +386,7 @@ export function makeRow(entry, { onChange, onRemove, onReplace, onInfoToolkit, o
   if (clipStrength) row.appendChild(clipStrength);
   row.appendChild(infoToolkit);
   row.appendChild(infoFull);
+  row.appendChild(replace);
   row.appendChild(remove);
 
   return row;

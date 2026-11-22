@@ -161,7 +161,8 @@ const CSS = `    .fll-container {
     }
     .fll-preview-tip {
       position: fixed;
-      z-index: 10050;
+      /* Above preset dialogs (12000/12100) so hover tips work in Manage/Edit */
+      z-index: 13050;
       pointer-events: none;
       padding: 4px;
       background: #1c1c1f;
@@ -290,6 +291,29 @@ const CSS = `    .fll-container {
       -moz-appearance: textfield;
     }
 
+    .fll-replace {
+      flex: 0 0 20px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .fll-replace:hover {
+      background: #3a3a3e;
+      color: #a78bfa;
+    }
+    .fll-replace svg {
+      width: 13px;
+      height: 13px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+    }
+
     .fll-remove {
       flex: 0 0 20px;
       width: 20px;
@@ -345,6 +369,11 @@ const CSS = `    .fll-container {
       width: 30px;
       display: flex;
       align-items: center;
+    }
+    .fll-header-replace-slot {
+      flex: 0 0 20px;
+      width: 20px;
+      height: 20px;
     }
     .fll-header-remove-slot {
       flex: 0 0 20px;
@@ -431,13 +460,14 @@ const CSS = `    .fll-container {
     .fll-popup-overlay {
       position: fixed;
       inset: 0;
-      z-index: 10000;
+      /* Above preset dialogs so Add/Replace LoRA picker is usable from Edit */
+      z-index: 13000;
       background: rgba(0,0,0,0.35);
     }
 
     .fll-popup {
       position: fixed;
-      z-index: 10001;
+      z-index: 13001;
       min-width: 400px;
       max-width: 600px;
       width: min(600px, calc(100vw - 24px));
@@ -563,7 +593,7 @@ const CSS = `    .fll-container {
     }
     .fll-search-group {
       padding: 6px 8px 4px 8px;
-      margin-top: 4px;
+      margin-top: 2px;
       font-size: 11px;
       color: #a78bfa;
       border-bottom: 1px solid #38383c;
@@ -650,7 +680,8 @@ const CSS = `    .fll-container {
       top: 0; left: 0;
       width: 100%; height: 100%;
       background: rgba(0,0,0,0.75);
-      z-index: 10000;
+      /* Above preset dialogs when opened from Edit */
+      z-index: 13100;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -807,12 +838,548 @@ const CSS = `    .fll-container {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    /* --- Preset toolbar on node --- */
+    .fll-preset-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .fll-preset-btn {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color, #444);
+      background: var(--comfy-input-bg, #2a2a2e);
+      color: var(--input-text, #ddd);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      user-select: none;
+      box-sizing: border-box;
+    }
+    .fll-preset-btn:hover {
+      filter: brightness(1.15);
+    }
+    .fll-preset-btn svg {
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
+      stroke: currentColor;
+      fill: none;
+    }
+
+    /* Loaded · chip (prompt-craft style binding) */
+    .fll-loaded-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 22px;
+      padding: 0 2px;
+      color: var(--descrip-text, #aaa);
+      font-size: 11px;
+    }
+    .fll-loaded-row[hidden] {
+      display: none !important;
+    }
+    .fll-loaded-info {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+    }
+    .fll-loaded-label {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fll-loaded-label::before {
+      content: "Loaded · ";
+      color: var(--descrip-text, #777);
+    }
+    .fll-loaded-reset,
+    .fll-loaded-clear {
+      flex: 0 0 22px;
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--descrip-text, #888);
+      cursor: pointer;
+    }
+    .fll-loaded-reset svg,
+    .fll-loaded-clear svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+    }
+    .fll-loaded-reset:hover,
+    .fll-loaded-clear:hover {
+      border-color: var(--border-color, #555);
+      color: var(--input-text, #ddd);
+      background: var(--comfy-input-bg, #2a2a2e);
+    }
+
+    /* --- Preset dialogs --- */
+    .ullc-preset-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(3px);
+    }
+    .ullc-preset-backdrop.nested { z-index: 12100; }
+    .ullc-preset-popup {
+      position: relative;
+      max-width: min(560px, calc(100vw - 32px));
+      max-height: min(88vh, 760px);
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color, #444);
+      background: var(--comfy-menu-bg, #1e1e1e);
+      color: var(--input-text, #ddd);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      font-family: inherit;
+      font-size: 12px;
+      overflow: hidden;
+    }
+    .ullc-preset-popup-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .ullc-preset-popup-title {
+      flex: 1 1 auto;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .ullc-preset-popup-close {
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: #aaa;
+      cursor: pointer;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .ullc-preset-popup-close:hover { background: #333; color: #fff; }
+    .ullc-preset-popup-close svg { width: 16px; height: 16px; }
+    .ullc-preset-popup-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .ullc-preset-input,
+    .ullc-preset-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 9px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #2a2a2e;
+      color: #ddd;
+      font: inherit;
+    }
+    .ullc-preset-textarea { resize: vertical; min-height: 48px; }
+    .ullc-preset-input:focus,
+    .ullc-preset-textarea:focus {
+      outline: none;
+      border-color: #a78bfa;
+    }
+    .ullc-preset-hint {
+      color: #888;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .ullc-preset-message {
+      color: #999;
+      padding: 12px 4px;
+      text-align: center;
+    }
+    .ullc-preset-error {
+      color: #ff8a80;
+      font-size: 11px;
+      min-height: 1em;
+    }
+    .ullc-preset-banner {
+      background: #3a2a1a;
+      border: 1px solid #c07830;
+      color: #ffcc80;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .ullc-preset-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .ullc-preset-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color, #444);
+      background: var(--comfy-input-bg, #2a2a2e);
+      color: var(--input-text, #ddd);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    .ullc-preset-btn:hover:not(:disabled) { filter: brightness(1.15); }
+    .ullc-preset-btn.primary {
+      background: #2f2b3d;
+      border-color: #6d5aa8;
+      color: #e8e4f5;
+    }
+    .ullc-preset-btn.danger {
+      background: #3a2323;
+      border-color: #c0392b;
+      color: #ff8a80;
+    }
+    .ullc-preset-btn.sm { height: 24px; padding: 0 8px; font-size: 11px; }
+    .ullc-preset-btn:disabled { opacity: 0.4; cursor: default; }
+    .ullc-preset-folder-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .ullc-preset-folder-row .ullc-preset-input { flex: 1 1 auto; min-width: 0; }
+    .ullc-preset-folder-row .ullc-preset-btn { flex: 0 0 auto; }
+    .ullc-shelf-crumbs {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 2px;
+    }
+    .ullc-shelf-crumb {
+      border: none;
+      background: transparent;
+      color: #aaa;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .ullc-shelf-crumb:hover { color: #fff; background: #333; }
+    .ullc-shelf-crumb.current {
+      color: #e8e4f5;
+      cursor: default;
+      font-weight: 600;
+    }
+    .ullc-shelf-crumb-sep { color: #666; font-size: 11px; }
+    .ullc-shelf-pick-list {
+      flex: 1 1 auto;
+      min-height: 140px;
+      max-height: min(40vh, 320px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .ullc-shelf-pick-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      border: 1px solid #3a3a40;
+      background: #2a2a2e;
+      color: #ddd;
+      border-radius: 6px;
+      padding: 7px 9px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .ullc-shelf-pick-item:hover { border-color: #6d5aa8; }
+    .ullc-shelf-pick-item.folder::before {
+      content: "›";
+      color: #888;
+      margin-right: 2px;
+    }
+    .ullc-shelf-pick-count { color: #888; font-size: 11px; }
+    .ullc-preset-icon-btn {
+      width: 26px;
+      height: 26px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #aaa;
+      border-radius: 5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .ullc-preset-icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+    .ullc-preset-icon-btn:hover { background: #333; color: #fff; }
+    .ullc-preset-icon-btn.danger:hover { color: #ff8a80; }
+    .ullc-preset-list {
+      flex: 1 1 auto;
+      min-height: 180px;
+      max-height: min(52vh, 480px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 2px;
+    }
+    .ullc-preset-folder {
+      border: 1px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #252528;
+    }
+    .ullc-preset-folder.collapsed > .ullc-preset-folder-body { display: none; }
+    .ullc-preset-folder-head {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: none;
+      background: #2c2c30;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+      box-sizing: border-box;
+    }
+    .ullc-preset-folder-manage { cursor: default; }
+    .ullc-preset-folder-toggle {
+      border: none;
+      background: transparent;
+      color: #aaa;
+      padding: 0;
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .ullc-preset-folder-chevron,
+    .ullc-preset-folder-toggle svg {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      transition: transform 0.15s ease;
+    }
+    .ullc-preset-folder.collapsed .ullc-preset-folder-chevron,
+    .ullc-preset-folder.collapsed .ullc-preset-folder-toggle svg {
+      transform: rotate(-90deg);
+    }
+    .ullc-preset-folder-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ullc-preset-folder-count {
+      color: #888;
+      font-size: 11px;
+      margin-right: 4px;
+    }
+    .ullc-preset-folder-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px;
+    }
+    .ullc-preset-card {
+      border: 1px solid #3a3a40;
+      border-radius: 7px;
+      padding: 7px 8px;
+      background: #2a2a2e;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ullc-preset-card-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      justify-content: space-between;
+    }
+    .ullc-preset-card-name {
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ullc-preset-card-meta { color: #888; font-size: 11px; flex-shrink: 0; }
+    .ullc-preset-card-actions {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .ullc-preset-card-desc {
+      color: #999;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .ullc-preset-entry-list {
+      flex: 1 1 auto;
+      min-height: 120px;
+      max-height: min(40vh, 360px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ullc-preset-entry-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #3a3a40;
+      background: #2a2a2e;
+    }
+    .ullc-preset-entry-row.changed {
+      background: #3a2323;
+      border-color: #c0392b;
+    }
+    .ullc-preset-entry-row.missing {
+      background: #4a1f1f;
+      border-color: #e74c3c;
+    }
+    .ullc-preset-entry-info {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ullc-preset-entry-name {
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ullc-preset-entry-path {
+      font-size: 10px;
+      color: #888;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ullc-preset-entry-row.changed .ullc-preset-entry-name,
+    .ullc-preset-entry-row.missing .ullc-preset-entry-name {
+      color: #ff8a80;
+    }
+    .ullc-preset-entry-btns {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .ullc-preset-edit-toolbar {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .ullc-preset-node-header {
+      flex-shrink: 0;
+      margin: 0;
+    }
+    .ullc-preset-node-list {
+      gap: 4px;
+    }
+    .ullc-preset-node-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      padding: 1px;
+    }
+    .ullc-preset-node-row .fll-row {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .ullc-preset-node-row.changed {
+      border-color: #c0392b;
+      background: rgba(192, 57, 43, 0.12);
+    }
+    .ullc-preset-node-row.missing {
+      border-color: #e74c3c;
+      background: rgba(231, 76, 60, 0.16);
+    }
+    .ullc-preset-popup {
+      max-width: min(780px, calc(100vw - 32px));
+    }
+    .ullc-preset-check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      color: #ccc;
+      font-size: 12px;
+    }
+    .ullc-preset-check {
+      width: 14px;
+      height: 14px;
+      accent-color: #a78bfa;
+    }
 `;
 
-export function injectStyles(styleId = "ultimate-lora-loader-civitai-styles") {
-  if (document.getElementById(styleId)) return;
-  const style = document.createElement("style");
-  style.id = styleId;
-  style.textContent = CSS;
-  document.head.appendChild(style);
+export function injectStyles(
+    styleId = "ultimate-lora-loader-civitai-styles",
+) {
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = CSS;
+    document.head.appendChild(style);
 }
