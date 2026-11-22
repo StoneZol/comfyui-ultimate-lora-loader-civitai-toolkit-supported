@@ -405,12 +405,20 @@ const CSS = `    .fll-container {
       width: 100%;
       box-sizing: border-box;
     }
+    .fll-add-row {
+      display: flex;
+      align-items: stretch;
+      gap: 6px;
+      width: 100%;
+      box-sizing: border-box;
+    }
     .fll-add-btn {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      width: 100%;
+      flex: 1 1 auto;
+      min-width: 0;
       box-sizing: border-box;
       margin: 0;
       padding: 6px 0;
@@ -425,6 +433,38 @@ const CSS = `    .fll-container {
     .fll-add-btn:hover {
       background: #3d3d43;
       border-color: #5a5a62;
+    }
+    .fll-settings-btn {
+      flex: 0 0 28px;
+      width: 28px;
+      height: auto;
+      min-height: 28px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      background: #333338;
+      border: 1px solid #46464c;
+      border-radius: 6px;
+      color: #999;
+      cursor: pointer;
+    }
+    .fll-settings-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+    }
+    .fll-settings-btn:hover {
+      background: #3d3d43;
+      border-color: #5a5a62;
+      color: #ddd;
+    }
+    .fll-settings-btn.active {
+      color: #c4b5fd;
+      border-color: #6d5aa8;
+      background: #2f2b3d;
     }
     .fll-heal-notice {
       display: flex;
@@ -844,7 +884,9 @@ const CSS = `    .fll-container {
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
-      margin-bottom: 4px;
+    }
+    .fll-preset-bar[hidden] {
+      display: none !important;
     }
     .fll-preset-btn {
       flex: 1 1 auto;

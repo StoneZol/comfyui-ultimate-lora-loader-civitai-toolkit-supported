@@ -93,6 +93,9 @@ export async function deleteCategory(name) {
   return readJson(res);
 }
 
+/** Fired after prefs PATCH succeeds — all node copies should refresh chrome. */
+export const UI_PREFS_EVENT = "ullc-ui-prefs-changed";
+
 export async function getPrefs() {
   const res = await api.fetchApi(base("/prefs"));
   return readJson(res);
@@ -104,5 +107,13 @@ export async function updatePrefs(prefs) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prefs }),
   });
-  return readJson(res);
+  const data = await readJson(res);
+  if (data?.ok) {
+    window.dispatchEvent(
+      new CustomEvent(UI_PREFS_EVENT, {
+        detail: { prefs: data.prefs || prefs || {} },
+      }),
+    );
+  }
+  return data;
 }

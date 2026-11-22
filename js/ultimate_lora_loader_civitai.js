@@ -18,13 +18,20 @@ import {
   LOAD_ICON_SVG,
   RESET_ICON_SVG,
   SAVE_ICON_SVG,
+  SETTINGS_ICON_SVG,
   TRASH_ICON_SVG,
 } from "./ullc/icons.js";
 import { openSavePresetDialog } from "./ullc/presets_save.js";
 import { openLoadPresetDialog } from "./ullc/presets_load.js";
 import { openManagePresetsDialog } from "./ullc/presets_manager.js";
+import { openPopup } from "./ullc/presets_popup.js";
 import { cloneEntries, enrichPresetEntries } from "./ullc/presets_enrich.js";
-import { listPresets } from "./ullc/presets_api.js";
+import {
+  UI_PREFS_EVENT,
+  getPrefs,
+  listPresets,
+  updatePrefs,
+} from "./ullc/presets_api.js";
 import {
   normalizeLoaded,
   parseLorasData,
@@ -250,9 +257,20 @@ app.registerExtension({
 
       presetBar.append(loadPresetBtn, savePresetBtn, managePresetBtn);
 
+      const addRow = document.createElement("div");
+      addRow.className = "fll-add-row";
+
       const addBtn = document.createElement("div");
       addBtn.className = "fll-add-btn";
       addBtn.innerHTML = `<span>Add Lora</span>`;
+
+      const settingsBtn = document.createElement("button");
+      settingsBtn.type = "button";
+      settingsBtn.className = "fll-settings-btn";
+      settingsBtn.innerHTML = SETTINGS_ICON_SVG;
+      settingsBtn.title = "Node settings";
+
+      addRow.append(addBtn, settingsBtn);
 
       const loadedRow = document.createElement("div");
       loadedRow.className = "fll-loaded-row";
@@ -278,22 +296,121 @@ app.registerExtension({
 
       loadedRow.append(loadedInfo, reloadLoadedBtn, detachLoadedBtn);
 
+      let showPresetBar = true;
+
+      function applyPresetBarVisibility() {
+        presetBar.hidden = !showPresetBar;
+        settingsBtn.classList.toggle("active", showPresetBar);
+        paintLoaded();
+        resizeNode();
+      }
+
       addSection.appendChild(presetBar);
-      addSection.appendChild(addBtn);
+      addSection.appendChild(addRow);
       addSection.appendChild(loadedRow);
+
+      function syncShowPresetBar(next) {
+        showPresetBar = !!next;
+        applyPresetBarVisibility();
+      }
+
+      getPrefs()
+        .then((res) => {
+          if (res?.ok && res.prefs && "showPresetBar" in res.prefs) {
+            syncShowPresetBar(res.prefs.showPresetBar);
+          } else {
+            applyPresetBarVisibility();
+          }
+        })
+        .catch(() => {
+          applyPresetBarVisibility();
+        });
+
+      // Global SQLite pref — every node copy listens and updates chrome together.
+      function onGlobalPrefs(e) {
+        const prefs = e?.detail?.prefs;
+        if (!prefs || !("showPresetBar" in prefs)) return;
+        syncShowPresetBar(prefs.showPresetBar);
+      }
+      window.addEventListener(UI_PREFS_EVENT, onGlobalPrefs);
 
       function paintLoaded() {
         const name = (loadedPreset?.title || "").trim();
-        if (!name) {
+        // Presets off → hide Load/Save/Manage and the loaded chip too.
+        if (!showPresetBar || !name) {
           loadedRow.hidden = true;
-          loadedLabel.textContent = "";
-          loadedLabel.removeAttribute("title");
+          if (!name) {
+            loadedLabel.textContent = "";
+            loadedLabel.removeAttribute("title");
+          }
           return;
         }
         loadedRow.hidden = false;
         loadedLabel.textContent = name;
         const shelf = (loadedPreset?.category || "").trim();
         loadedLabel.title = shelf ? `Loaded: ${shelf} / ${name}` : `Loaded: ${name}`;
+      }
+
+      function openNodeSettingsDialog() {
+        openPopup({
+          title: "Settings",
+          width: 320,
+          render(body) {
+            const row = document.createElement("div");
+            row.className = "ullc-preset-toggle-row";
+            row.title =
+              "Global for every Ultimate LoRA Loader node — hides Load / Save / Manage and the loaded chip";
+
+            const toggle = document.createElement("div");
+            toggle.className = "fll-toggle-switch" + (showPresetBar ? " on" : "");
+            toggle.setAttribute("role", "switch");
+            toggle.setAttribute(
+              "aria-checked",
+              showPresetBar ? "true" : "false",
+            );
+            const knob = document.createElement("div");
+            knob.className = "fll-toggle-knob";
+            toggle.appendChild(knob);
+
+            const label = document.createElement("span");
+            label.textContent = "Presets (Load · Save · Manage)";
+
+            const hint = document.createElement("div");
+            hint.className = "ullc-preset-hint";
+            hint.textContent = showPresetBar
+              ? "On for all nodes — toolbar + loaded chip"
+              : "Off for all nodes — toolbar + loaded chip hidden";
+
+            function paintToggle() {
+              toggle.classList.toggle("on", showPresetBar);
+              toggle.setAttribute(
+                "aria-checked",
+                showPresetBar ? "true" : "false",
+              );
+              hint.textContent = showPresetBar
+                ? "On for all nodes — toolbar + loaded chip"
+                : "Off for all nodes — toolbar + loaded chip hidden";
+            }
+
+            row.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const next = !showPresetBar;
+              // Persist first; event updates every node copy (including this one).
+              updatePrefs({ showPresetBar: next })
+                .then((res) => {
+                  if (!res?.ok) syncShowPresetBar(next);
+                  paintToggle();
+                })
+                .catch(() => {
+                  syncShowPresetBar(next);
+                  paintToggle();
+                });
+            });
+
+            row.append(toggle, label);
+            body.append(row, hint);
+          },
+        });
       }
 
       function setLoaded(next) {
@@ -480,6 +597,9 @@ app.registerExtension({
         const loadedExtra = !loadedRow.hidden
           ? LOADED_ROW_HEIGHT + GAP_BETWEEN_SECTIONS
           : 0;
+        const presetExtra = !presetBar.hidden
+          ? PRESET_BAR_HEIGHT + GAP_BETWEEN_SECTIONS
+          : 0;
 
         // "Chrome" = everything in the column except the row list itself:
         // add button, header row (+ its gap), and container's own vertical
@@ -490,8 +610,7 @@ app.registerExtension({
         // left for rowsWrap once the node is smaller than that (floor /
         // manual resize).
         const chromeHeight =
-          PRESET_BAR_HEIGHT +
-          GAP_BETWEEN_SECTIONS +
+          presetExtra +
           ADD_BTN_HEIGHT +
           loadedExtra +
           headerHeight +
@@ -730,6 +849,11 @@ app.registerExtension({
         openManagePresetsDialog();
       };
 
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        openNodeSettingsDialog();
+      };
+
       reloadLoadedBtn.onclick = (e) => {
         e.stopPropagation();
         reloadLoadedPreset().catch((err) => {
@@ -811,6 +935,7 @@ app.registerExtension({
 
       const onRemoved = node.onRemoved;
       node.onRemoved = function () {
+        window.removeEventListener(UI_PREFS_EVENT, onGlobalPrefs);
         unsubMeta?.();
         if (lorasWidgetObserver) {
           lorasWidgetObserver.disconnect();
