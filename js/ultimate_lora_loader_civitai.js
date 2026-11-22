@@ -1,12 +1,43 @@
 import { app } from "../../../scripts/app.js";
 import { loadConfig } from "./ullc/config.js";
 import { injectStyles } from "./ullc/styles.js";
-import { openCivitaiToolkitLoraInfo } from "./ullc/civitai_toolkit_info.js";
+import {
+  clearEntryDisplay,
+  openCivitaiToolkitLoraInfo,
+  onCivitaiMetaReady,
+  prefetchCivitaiMeta,
+  seedEntryDisplay,
+  syncEntriesDisplayFromCache,
+} from "./ullc/civitai_toolkit_info.js";
 import { openPysssssLoraInfo } from "./ullc/pysssss_info.js";
-import { fetchLoraTree } from "./ullc/lora_tree.js";
+import { fetchLoraTree, healMissingLoraPaths } from "./ullc/lora_tree.js";
 import { openLoraBrowser } from "./ullc/lora_browser.js";
 import { makeRow } from "./ullc/lora_row.js";
-import { TRASH_ICON_SVG } from "./ullc/icons.js";
+import {
+  CLOSE_ICON_SVG,
+  LOAD_ICON_SVG,
+  RESET_ICON_SVG,
+  SAVE_ICON_SVG,
+  SETTINGS_ICON_SVG,
+  TRASH_ICON_SVG,
+} from "./ullc/icons.js";
+import { openSavePresetDialog } from "./ullc/presets_save.js";
+import { openLoadPresetDialog } from "./ullc/presets_load.js";
+import { openManagePresetsDialog } from "./ullc/presets_manager.js";
+import { openPopup } from "./ullc/presets_popup.js";
+import { cloneEntries, enrichPresetEntries } from "./ullc/presets_enrich.js";
+import {
+  UI_PREFS_EVENT,
+  getPrefs,
+  listPresets,
+  updatePrefs,
+} from "./ullc/presets_api.js";
+import {
+  normalizeLoaded,
+  parseLorasData,
+  serializeLorasData,
+} from "./ullc/presets_data.js";
+import { addEntryUnique, replaceEntryToEnd } from "./ullc/lora_stack.js";
 
 const config = await loadConfig();
 injectStyles(config.style_id);
@@ -105,7 +136,7 @@ app.registerExtension({
           const val = elm.value !== undefined ? elm.value : elm.textContent;
           if (
             typeof val === "string" &&
-            val.trim().startsWith("[") &&
+            (val.trim().startsWith("[") || val.trim().startsWith("{")) &&
             val.includes('"lora"') &&
             val.includes('"enabled"')
           ) {
@@ -123,10 +154,11 @@ app.registerExtension({
       }
 
       let entries = [];
-      try {
-        entries = dataWidget?.value ? JSON.parse(dataWidget.value) : [];
-      } catch (e) {
-        entries = [];
+      let loadedPreset = null;
+      {
+        const parsed = parseLorasData(dataWidget?.value);
+        entries = parsed.entries;
+        loadedPreset = parsed.loaded;
       }
 
       const container = document.createElement("div");
@@ -191,6 +223,9 @@ app.registerExtension({
       headerRow.appendChild(strengthLabel);
       headerRow.appendChild(clipStrengthLabel);
       headerRow.appendChild(infoHeaderPair);
+      const replaceHeaderSlot = document.createElement("div");
+      replaceHeaderSlot.className = "fll-header-replace-slot";
+      headerRow.appendChild(replaceHeaderSlot);
       headerRow.appendChild(deleteAllSlot);
 
       const rowsWrap = document.createElement("div");
@@ -199,16 +234,198 @@ app.registerExtension({
       rowsWrap.style.gap = "4px";
       rowsWrap.style.boxSizing = "border-box";
 
+      const addSection = document.createElement("div");
+      addSection.className = "fll-add-section";
+
+      const presetBar = document.createElement("div");
+      presetBar.className = "fll-preset-bar";
+
+      const loadPresetBtn = document.createElement("div");
+      loadPresetBtn.className = "fll-preset-btn";
+      loadPresetBtn.innerHTML = `${LOAD_ICON_SVG}<span>Load</span>`;
+      loadPresetBtn.title = "Load preset (Replace or Merge)";
+
+      const savePresetBtn = document.createElement("div");
+      savePresetBtn.className = "fll-preset-btn";
+      savePresetBtn.innerHTML = `${SAVE_ICON_SVG}<span>Save</span>`;
+      savePresetBtn.title = "Save current stack as preset";
+
+      const managePresetBtn = document.createElement("div");
+      managePresetBtn.className = "fll-preset-btn";
+      managePresetBtn.textContent = "Manage";
+      managePresetBtn.title = "Manage presets (edit / heal / swap missing)";
+
+      presetBar.append(loadPresetBtn, savePresetBtn, managePresetBtn);
+
+      const addRow = document.createElement("div");
+      addRow.className = "fll-add-row";
+
       const addBtn = document.createElement("div");
       addBtn.className = "fll-add-btn";
       addBtn.innerHTML = `<span>Add Lora</span>`;
 
+      const settingsBtn = document.createElement("button");
+      settingsBtn.type = "button";
+      settingsBtn.className = "fll-settings-btn";
+      settingsBtn.innerHTML = SETTINGS_ICON_SVG;
+      settingsBtn.title = "Node settings";
+
+      addRow.append(addBtn, settingsBtn);
+
+      const loadedRow = document.createElement("div");
+      loadedRow.className = "fll-loaded-row";
+      loadedRow.hidden = true;
+
+      const loadedInfo = document.createElement("span");
+      loadedInfo.className = "fll-loaded-info";
+      const loadedLabel = document.createElement("span");
+      loadedLabel.className = "fll-loaded-label";
+      loadedInfo.appendChild(loadedLabel);
+
+      const reloadLoadedBtn = document.createElement("button");
+      reloadLoadedBtn.type = "button";
+      reloadLoadedBtn.className = "fll-loaded-reset";
+      reloadLoadedBtn.title = "Reload from saved preset";
+      reloadLoadedBtn.innerHTML = RESET_ICON_SVG;
+
+      const detachLoadedBtn = document.createElement("button");
+      detachLoadedBtn.type = "button";
+      detachLoadedBtn.className = "fll-loaded-clear";
+      detachLoadedBtn.title = "Detach loaded preset";
+      detachLoadedBtn.innerHTML = CLOSE_ICON_SVG;
+
+      loadedRow.append(loadedInfo, reloadLoadedBtn, detachLoadedBtn);
+
+      let showPresetBar = false;
+
+      function applyPresetBarVisibility() {
+        presetBar.hidden = !showPresetBar;
+        paintLoaded();
+        resizeNode();
+      }
+
+      addSection.appendChild(presetBar);
+      addSection.appendChild(addRow);
+      addSection.appendChild(loadedRow);
+
+      function syncShowPresetBar(next) {
+        showPresetBar = !!next;
+        applyPresetBarVisibility();
+      }
+
+      getPrefs()
+        .then((res) => {
+          if (res?.ok && res.prefs && "showPresetBar" in res.prefs) {
+            syncShowPresetBar(res.prefs.showPresetBar);
+          } else {
+            applyPresetBarVisibility();
+          }
+        })
+        .catch(() => {
+          applyPresetBarVisibility();
+        });
+
+      // Global SQLite pref — every node copy listens and updates chrome together.
+      function onGlobalPrefs(e) {
+        const prefs = e?.detail?.prefs;
+        if (!prefs || !("showPresetBar" in prefs)) return;
+        syncShowPresetBar(prefs.showPresetBar);
+      }
+      window.addEventListener(UI_PREFS_EVENT, onGlobalPrefs);
+
+      function paintLoaded() {
+        const name = (loadedPreset?.title || "").trim();
+        // Presets off → hide Load/Save/Manage and the loaded chip too.
+        if (!showPresetBar || !name) {
+          loadedRow.hidden = true;
+          if (!name) {
+            loadedLabel.textContent = "";
+            loadedLabel.removeAttribute("title");
+          }
+          return;
+        }
+        loadedRow.hidden = false;
+        loadedLabel.textContent = name;
+        const shelf = (loadedPreset?.category || "").trim();
+        loadedLabel.title = shelf ? `Loaded: ${shelf} / ${name}` : `Loaded: ${name}`;
+      }
+
+      function openNodeSettingsDialog() {
+        openPopup({
+          title: "Settings",
+          width: 320,
+          render(body) {
+            const row = document.createElement("div");
+            row.className = "ullc-preset-toggle-row";
+            row.title =
+              "Global for every Ultimate LoRA Loader node — hides Load / Save / Manage and the loaded chip";
+
+            const toggle = document.createElement("div");
+            toggle.className = "fll-toggle-switch" + (showPresetBar ? " on" : "");
+            toggle.setAttribute("role", "switch");
+            toggle.setAttribute(
+              "aria-checked",
+              showPresetBar ? "true" : "false",
+            );
+            const knob = document.createElement("div");
+            knob.className = "fll-toggle-knob";
+            toggle.appendChild(knob);
+
+            const label = document.createElement("span");
+            label.textContent = "Presets (Load · Save · Manage)";
+
+            const hint = document.createElement("div");
+            hint.className = "ullc-preset-hint";
+            hint.textContent = showPresetBar
+              ? "On for all nodes — toolbar + loaded chip"
+              : "Off for all nodes — toolbar + loaded chip hidden";
+
+            function paintToggle() {
+              toggle.classList.toggle("on", showPresetBar);
+              toggle.setAttribute(
+                "aria-checked",
+                showPresetBar ? "true" : "false",
+              );
+              hint.textContent = showPresetBar
+                ? "On for all nodes — toolbar + loaded chip"
+                : "Off for all nodes — toolbar + loaded chip hidden";
+            }
+
+            row.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const next = !showPresetBar;
+              // Persist first; event updates every node copy (including this one).
+              updatePrefs({ showPresetBar: next })
+                .then((res) => {
+                  if (!res?.ok) syncShowPresetBar(next);
+                  paintToggle();
+                })
+                .catch(() => {
+                  syncShowPresetBar(next);
+                  paintToggle();
+                });
+            });
+
+            row.append(toggle, label);
+            body.append(row, hint);
+          },
+        });
+      }
+
+      function setLoaded(next) {
+        loadedPreset = normalizeLoaded(next);
+        paintLoaded();
+        resizeNode();
+      }
+
       function persist() {
         if (dataWidget) {
-          dataWidget.value = JSON.stringify(entries);
+          dataWidget.value = serializeLorasData(entries, loadedPreset);
         }
         node.setDirtyCanvas(true, true);
       }
+
+      paintLoaded();
 
       function isClipConnected() {
         // clip is an optional input now - only show its strength control
@@ -234,9 +451,13 @@ app.registerExtension({
               resizeNode();
             },
             onReplace: (loraPath) => {
-              entry.lora = loraPath;
+              const next = replaceEntryToEnd(entries, idx, loraPath);
+              if (!next) return;
+              clearEntryDisplay(next);
+              seedEntryDisplay(next);
               persist();
               render();
+              resizeNode();
             },
             onInfoToolkit: (loraPath) => {
               openCivitaiToolkitLoraInfo(loraPath);
@@ -360,6 +581,8 @@ app.registerExtension({
       const ROW_GAP = 4; // gap between rows in rowsWrap
       const HEADER_HEIGHT = 20; // .fll-header-row: toggle switch (16px) + row padding 2px*2 (4px)
       const ADD_BTN_HEIGHT = 28; // .fll-add-btn: ~14px text line + padding 6px*2 (12px) + border 1px*2 (2px)
+      const PRESET_BAR_HEIGHT = 28; // Load / Save / Manage row
+      const LOADED_ROW_HEIGHT = 24; // Loaded · chip under Add Lora
       const CONTAINER_PADDING_V = 12; // .fll-container top+bottom padding (6+6)
       const SOCKET_ROWS_HEIGHT = 56; // title bar + model/clip socket rows above the DOM widget
       const GAP_BETWEEN_SECTIONS = 4; // .fll-container's own `gap` between header/rowsWrap/addBtn
@@ -370,6 +593,12 @@ app.registerExtension({
         const rowCount = entries.length;
         const rowsHeightFull = rowCount > 0 ? rowCount * ROW_HEIGHT + (rowCount - 1) * ROW_GAP : 0;
         const headerHeight = rowCount > 0 ? HEADER_HEIGHT + GAP_BETWEEN_SECTIONS : 0;
+        const loadedExtra = !loadedRow.hidden
+          ? LOADED_ROW_HEIGHT + GAP_BETWEEN_SECTIONS
+          : 0;
+        const presetExtra = !presetBar.hidden
+          ? PRESET_BAR_HEIGHT + GAP_BETWEEN_SECTIONS
+          : 0;
 
         // "Chrome" = everything in the column except the row list itself:
         // add button, header row (+ its gap), and container's own vertical
@@ -380,7 +609,13 @@ app.registerExtension({
         // left for rowsWrap once the node is smaller than that (floor /
         // manual resize).
         const chromeHeight =
-          ADD_BTN_HEIGHT + headerHeight + (rowCount > 0 ? GAP_BETWEEN_SECTIONS : 0) + CONTAINER_PADDING_V + BOTTOM_SLACK;
+          presetExtra +
+          ADD_BTN_HEIGHT +
+          loadedExtra +
+          headerHeight +
+          (rowCount > 0 ? GAP_BETWEEN_SECTIONS : 0) +
+          CONTAINER_PADDING_V +
+          BOTTOM_SLACK;
 
         const minRowsVisible = Math.min(rowCount, MIN_VISIBLE_ROWS);
         const floorRowsHeight = minRowsVisible > 0 ? minRowsVisible * ROW_HEIGHT + (minRowsVisible - 1) * ROW_GAP : 0;
@@ -478,6 +713,22 @@ app.registerExtension({
         return r2;
       };
 
+      // Fetch on-disk lora list + auto-heal entries moved within loras/
+      // (unique basename match). Shared by create and workflow configure.
+      function refreshTreeAndHeal() {
+        return fetchLoraTree().then(() => {
+          const healed = healMissingLoraPaths(entries);
+          if (healed.length) {
+            for (const entry of healed) {
+              clearEntryDisplay(entry);
+              seedEntryDisplay(entry);
+            }
+            persist();
+          }
+          render();
+        });
+      }
+
       // Re-neutralize the loras_data widget after workflow load/paste, since
       // onConfigure can rebuild widget state from serialized values.
       const onConfigure = node.onConfigure;
@@ -489,15 +740,19 @@ app.registerExtension({
           w.draw = () => {};
           w.mouse = () => false;
         }
-        try {
-          entries = w?.value ? JSON.parse(w.value) : [];
-        } catch (e) {
-          entries = [];
+        {
+          const parsed = parseLorasData(w?.value);
+          entries = parsed.entries;
+          loadedPreset = parsed.loaded;
+          paintLoaded();
         }
         render();
         syncWidth();
         resizeNode();
         hideDataWidgetDom();
+        // Heal after entries are loaded from the workflow (create-time heal
+        // may have raced with an empty list before onConfigure ran).
+        refreshTreeAndHeal();
         return r3;
       };
 
@@ -514,16 +769,115 @@ app.registerExtension({
         return r4;
       };
 
+      function applyPresetEntries(nextEntries, meta = {}) {
+        entries.length = 0;
+        for (const entry of cloneEntries(nextEntries)) {
+          seedEntryDisplay(entry);
+          entries.push(entry);
+        }
+        // Replace rebinds to the loaded preset; Merge keeps the current bind.
+        if (meta.mode === "replace") setLoaded(meta.loaded || null);
+        persist();
+        paintLoaded();
+        render();
+        resizeNode();
+        hideDataWidgetDom();
+      }
+
+      async function reloadLoadedPreset() {
+        const title = (loadedPreset?.title || "").trim();
+        const category = (loadedPreset?.category || "").trim();
+        if (!title) return;
+        const result = await listPresets({ category });
+        if (!result.ok) {
+          console.error(config.log_prefix, result.error || "Failed to reload preset");
+          return;
+        }
+        const key = title.toLowerCase();
+        let preset = null;
+        if (loadedPreset?.id) {
+          preset = (result.presets || []).find((p) => p.id === loadedPreset.id) || null;
+        }
+        if (!preset) {
+          preset =
+            (result.presets || []).find(
+              (p) => (p.title || "").trim().toLowerCase() === key,
+            ) || null;
+        }
+        if (!preset) {
+          console.warn(config.log_prefix, "Loaded preset not found in SQLite");
+          return;
+        }
+        const { entries: next } = await enrichPresetEntries(preset.entries || []);
+        applyPresetEntries(next, {
+          mode: "replace",
+          loaded: {
+            id: preset.id,
+            title: preset.title || title,
+            category: preset.category || category,
+          },
+        });
+      }
+
+      loadPresetBtn.onclick = (e) => {
+        e.stopPropagation();
+        openLoadPresetDialog({
+          currentEntries: entries,
+          onLoad: (next, meta) => applyPresetEntries(next, meta),
+        });
+      };
+
+      savePresetBtn.onclick = (e) => {
+        e.stopPropagation();
+        openSavePresetDialog({
+          entries,
+          loaded: loadedPreset,
+          onSaved: (result) => {
+            setLoaded({
+              id: result.id,
+              title: result.title,
+              category: result.category,
+            });
+            persist();
+          },
+        });
+      };
+
+      managePresetBtn.onclick = (e) => {
+        e.stopPropagation();
+        openManagePresetsDialog();
+      };
+
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        openNodeSettingsDialog();
+      };
+
+      reloadLoadedBtn.onclick = (e) => {
+        e.stopPropagation();
+        reloadLoadedPreset().catch((err) => {
+          console.error(config.log_prefix, err);
+        });
+      };
+
+      detachLoadedBtn.onclick = (e) => {
+        e.stopPropagation();
+        setLoaded(null);
+        persist();
+      };
+
       addBtn.onclick = (e) => {
         e.stopPropagation();
         const rect = addBtn.getBoundingClientRect();
         openLoraBrowser(rect.left, rect.bottom + 4, (loraPath) => {
-          entries.push({
+          const newEntry = {
             lora: loraPath,
             enabled: true,
             strengthModel: 1.0,
             strengthClip: 1.0,
-          });
+          };
+          if (!addEntryUnique(entries, newEntry)) return;
+          seedEntryDisplay(newEntry);
           persist();
           render();
           resizeNode();
@@ -531,7 +885,7 @@ app.registerExtension({
         });
       };
 
-      container.appendChild(addBtn);
+      container.appendChild(addSection);
       container.appendChild(headerRow);
       container.appendChild(rowsWrap);
 
@@ -543,12 +897,20 @@ app.registerExtension({
       render();
       syncWidth();
 
-      // Fetch the on-disk lora list so missing-file highlighting can light up
-      // once we know what actually exists. The paint above happens first and
-      // flags nothing (validLoraPaths is null until this resolves); this
-      // re-render applies red highlighting to any rows pointing at files that
-      // are no longer present.
-      fetchLoraTree().then(() => render());
+      // Background: when Toolkit index is ready/refreshed, update persisted
+      // display fields only if something changed — then one re-render.
+      // Subsequent Comfy loads paint instantly from loras_data (no flicker).
+      const unsubMeta = onCivitaiMetaReady(() => {
+        if (syncEntriesDisplayFromCache(entries)) {
+          persist();
+          render();
+        }
+      });
+
+      // Warm Toolkit index once (shared promise + path map).
+      prefetchCivitaiMeta();
+
+      refreshTreeAndHeal();
 
       // restore size sanity on load (also re-syncs width once ComfyUI has
       // finished laying out the node on the canvas, in case initial
@@ -572,6 +934,8 @@ app.registerExtension({
 
       const onRemoved = node.onRemoved;
       node.onRemoved = function () {
+        window.removeEventListener(UI_PREFS_EVENT, onGlobalPrefs);
+        unsubMeta?.();
         if (lorasWidgetObserver) {
           lorasWidgetObserver.disconnect();
           lorasWidgetObserver = null;

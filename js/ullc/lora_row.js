@@ -1,10 +1,9 @@
 import { app } from "../../../scripts/app.js";
 import { isLoraMissing } from "./lora_tree.js";
 import { openLoraBrowser } from "./lora_browser.js";
-import { TRASH_ICON_SVG } from "./icons.js";
-import { getCivitaiLoraMeta } from "./civitai_toolkit_info.js";
+import { IMAGE_ICON_SVG, REPLACE_ICON_SVG, TRASH_ICON_SVG } from "./icons.js";
+import { displayFieldsFromEntry, seedEntryDisplay } from "./civitai_toolkit_info.js";
 import { bindPreviewHover } from "./preview_tip.js";
-import { IMAGE_ICON_SVG } from "./icons.js";
 // ---------------------------------------------------------------------------
 // Node widget
 // ---------------------------------------------------------------------------
@@ -132,24 +131,44 @@ export function makeRow(entry, { onChange, onRemove, onReplace, onInfoToolkit, o
     name.removeAttribute("title");
   }
 
-  // Soft-enrich from Civitai Toolkit local DB (display name + cover; base in tooltip).
-  if (!missing) {
-    getCivitaiLoraMeta(entry.lora).then((meta) => {
-      if (!meta || !name.isConnected) return;
-      const civitaiName = (meta.civitai_model_name || "").trim();
-      if (civitaiName && civitaiName.toLowerCase() !== shortName.toLowerCase()) {
-        nameTitle.textContent = civitaiName;
-        nameFile.textContent = shortName;
-        nameFile.style.display = "";
-      }
-      if (meta.local_cover_path) {
-        coverUrl = meta.local_cover_path;
-        previewBtn.classList.add("has-preview");
-      }
-      const bm = (meta.base_model || "").trim();
+  // Paint display fields onto the row. NOTE: do NOT gate on name.isConnected —
+  // makeRow runs before the row is appended to the document, so isConnected is
+  // always false here. Setting textContent on a detached node is fine.
+  function applyDisplay(fields) {
+    if (!fields) return;
+    const civitaiName = (fields.civitaiName || "").trim();
+    if (civitaiName && civitaiName.toLowerCase() !== shortName.toLowerCase()) {
+      nameTitle.textContent = missing ? "⚠ " + civitaiName : civitaiName;
+      nameFile.textContent = shortName;
+      nameFile.style.display = "";
+    } else if (!missing) {
+      nameTitle.textContent = shortName;
+      nameFile.style.display = "none";
+      nameFile.textContent = "";
+    }
+    if (fields.coverPath) {
+      coverUrl = fields.coverPath;
+      previewBtn.classList.add("has-preview");
+    } else {
+      coverUrl = null;
+      previewBtn.classList.remove("has-preview");
+    }
+    if (!missing) {
+      const bm = (fields.baseModel || "").trim();
       if (bm) name.title = bm;
       else name.removeAttribute("title");
-    });
+    }
+  }
+
+  // 1) Instant paint from whatever was last saved in loras_data.
+  applyDisplay(displayFieldsFromEntry(entry));
+
+  // 2) If Toolkit index is already warm, fold fresh values into the entry
+  //    (persisted by onChange). Cold index is handled once at node level via
+  //    onCivitaiMetaReady → syncEntriesDisplayFromCache.
+  if (!missing && seedEntryDisplay(entry)) {
+    applyDisplay(displayFieldsFromEntry(entry));
+    onChange?.();
   }
 
   const STRENGTH_STEP = 0.05;
@@ -342,6 +361,17 @@ export function makeRow(entry, { onChange, onRemove, onReplace, onInfoToolkit, o
     onInfoFull?.(entry.lora);
   };
 
+  const replace = document.createElement("div");
+  replace.className = "fll-replace";
+  replace.innerHTML = REPLACE_ICON_SVG;
+  replace.title = "Replace LoRA";
+  replace.onclick = (e) => {
+    e.stopPropagation();
+    if (!onReplace) return;
+    const rect = replace.getBoundingClientRect();
+    openLoraBrowser(rect.left, rect.bottom + 4, (loraPath) => onReplace(loraPath));
+  };
+
   const remove = document.createElement("div");
   remove.className = "fll-remove";
   remove.innerHTML = TRASH_ICON_SVG;
@@ -356,6 +386,7 @@ export function makeRow(entry, { onChange, onRemove, onReplace, onInfoToolkit, o
   if (clipStrength) row.appendChild(clipStrength);
   row.appendChild(infoToolkit);
   row.appendChild(infoFull);
+  row.appendChild(replace);
   row.appendChild(remove);
 
   return row;
