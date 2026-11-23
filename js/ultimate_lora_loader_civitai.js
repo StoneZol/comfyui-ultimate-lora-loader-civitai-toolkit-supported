@@ -37,7 +37,7 @@ import {
   parseLorasData,
   serializeLorasData,
 } from "./ullc/presets_data.js";
-import { addEntryUnique, replaceEntryToEnd } from "./ullc/lora_stack.js";
+import { addOrBumpEntry, replaceEntryAt } from "./ullc/lora_stack.js";
 
 const config = await loadConfig();
 injectStyles(config.style_id);
@@ -451,7 +451,7 @@ app.registerExtension({
               resizeNode();
             },
             onReplace: (loraPath) => {
-              const next = replaceEntryToEnd(entries, idx, loraPath);
+              const next = replaceEntryAt(entries, idx, loraPath);
               if (!next) return;
               clearEntryDisplay(next);
               seedEntryDisplay(next);
@@ -876,8 +876,9 @@ app.registerExtension({
             strengthModel: 1.0,
             strengthClip: 1.0,
           };
-          if (!addEntryUnique(entries, newEntry)) return;
-          seedEntryDisplay(newEntry);
+          const result = addOrBumpEntry(entries, newEntry);
+          if (!result) return;
+          seedEntryDisplay(result.entry);
           persist();
           render();
           resizeNode();

@@ -13,39 +13,68 @@ export function indexOfLora(entries, loraPath) {
 }
 
 /**
- * Replace entry at `idx`: remove it, drop any other copies of `loraPath`,
- * append one row at the end (keeps enabled/strengths from the removed row).
- * Returns the new entry, or null if no-op.
+ * Replace entry at `idx` in place (keeps stack position).
+ * Drops any other copies of `loraPath`. Keeps enabled / strengths from the slot.
+ * Returns the updated entry, or null if no-op.
  */
-export function replaceEntryToEnd(entries, idx, loraPath) {
+export function replaceEntryAt(entries, idx, loraPath) {
   if (!Array.isArray(entries) || idx < 0 || idx >= entries.length || !loraPath) {
     return null;
   }
-  const removed = entries[idx];
   const key = normLoraPath(loraPath);
+  const cur = entries[idx];
+  if (normLoraPath(cur?.lora) === key) return null;
 
-  entries.splice(idx, 1);
+  // Remove other slots that already hold this path (idx stays stable if we go high→low).
   for (let i = entries.length - 1; i >= 0; i -= 1) {
-    if (normLoraPath(entries[i]?.lora) === key) entries.splice(i, 1);
+    if (i === idx) continue;
+    if (normLoraPath(entries[i]?.lora) === key) {
+      entries.splice(i, 1);
+      if (i < idx) idx -= 1;
+    }
   }
 
   const next = {
     lora: loraPath,
-    enabled: removed?.enabled !== false,
-    strengthModel: Number(removed?.strengthModel ?? removed?.strength ?? 1) || 0,
-    strengthClip: Number(removed?.strengthClip ?? removed?.strength ?? 1) || 0,
+    enabled: cur?.enabled !== false,
+    strengthModel: Number(cur?.strengthModel ?? cur?.strength ?? 1) || 0,
+    strengthClip: Number(cur?.strengthClip ?? cur?.strength ?? 1) || 0,
   };
-  entries.push(next);
+  // Drop stale Toolkit display fields — re-seed from cache on next paint.
+  entries[idx] = next;
   return next;
 }
 
+/** @deprecated use replaceEntryAt — kept as alias for older call sites */
+export const replaceEntryToEnd = replaceEntryAt;
+
 /**
- * Push entry only if its path is not already in the stack.
+ * Add LoRA: new → append at end.
+ * Duplicate path → enable if off, always move that slot to the end (no second copy).
+ * Returns { entry, added } or null.
+ */
+export function addOrBumpEntry(entries, entry) {
+  if (!Array.isArray(entries) || !entry?.lora) return null;
+
+  const existingIdx = indexOfLora(entries, entry.lora);
+  if (existingIdx < 0) {
+    entries.push(entry);
+    return { entry, added: true };
+  }
+
+  const [existing] = entries.splice(existingIdx, 1);
+  existing.enabled = true;
+  // Prefer kept strengths; refresh path string in case separators differ.
+  existing.lora = entry.lora;
+  entries.push(existing);
+  return { entry: existing, added: false };
+}
+
+/**
+ * Push only if path is missing. Prefer addOrBumpEntry for Add Lora UX.
  * Returns true when added.
  */
 export function addEntryUnique(entries, entry) {
-  if (!Array.isArray(entries) || !entry?.lora) return false;
-  if (indexOfLora(entries, entry.lora) >= 0) return false;
-  entries.push(entry);
-  return true;
+  const result = addOrBumpEntry(entries, entry);
+  return Boolean(result?.added);
 }
