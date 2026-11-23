@@ -19,7 +19,9 @@ Everything from the base node still works (folder browser, optional CLIP, drag-t
 
 Tested with **Civitai Toolkit 4.1.3** and **ComfyUI-Custom-Scripts 1.2.5**.
 
-**Latest:** [1.4.0 — LoRA presets](docs/1.4.0/CHANGELOG.md)
+**Latest:** [1.4.1 — stack add / swap fix](docs/1.4.1/CHANGELOG.md)
+
+Previous: [1.4.0 — LoRA presets](docs/1.4.0/CHANGELOG.md)
 
 ![1.4.0 presets](docs/1.4.0/1.png)
 

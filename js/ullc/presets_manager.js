@@ -8,7 +8,7 @@ import {
 import { openPysssssLoraInfo } from "./pysssss_info.js";
 import { makeRow } from "./lora_row.js";
 import { isLoraMissing } from "./lora_tree.js";
-import { addEntryUnique, replaceEntryToEnd } from "./lora_stack.js";
+import { addOrBumpEntry, replaceEntryAt } from "./lora_stack.js";
 import {
   deleteCategory,
   deletePreset,
@@ -136,7 +136,7 @@ function openEditPresetDialog(preset, { onSaved } = {}) {
               paintList();
             },
             onReplace: (loraPath) => {
-              const next = replaceEntryToEnd(working, idx, loraPath);
+              const next = replaceEntryAt(working, idx, loraPath);
               if (!next) return;
               clearEntryDisplay(next);
               seedEntryDisplay(next);
@@ -203,8 +203,9 @@ function openEditPresetDialog(preset, { onSaved } = {}) {
             strengthModel: 1.0,
             strengthClip: 1.0,
           };
-          if (!addEntryUnique(working, entry)) return;
-          seedEntryDisplay(entry);
+          const result = addOrBumpEntry(working, entry);
+          if (!result) return;
+          seedEntryDisplay(result.entry);
           missingFlags = working.map((e) => isLoraMissing(e.lora));
           paintList();
         });
